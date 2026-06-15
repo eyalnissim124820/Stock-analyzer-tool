@@ -81,15 +81,20 @@ export default function App() {
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);     // raw API response
   const [overrides, setOverrides] = useState({}); // id -> value (manual)
+  const [fetchedAt, setFetchedAt] = useState(null); // when the live data was last pulled
 
-  async function run() {
-    if (!ticker.trim()) return;
+  // `sym` lets the Refresh button re-fetch the currently shown ticker.
+  // Guard against React passing a click event in as the first arg.
+  async function run(sym) {
+    const symbol = (typeof sym === "string" ? sym : ticker).trim();
+    if (!symbol) return;
     setLoading(true); setError(null); setData(null); setOverrides({});
     try {
-      const r = await fetch(`/api/analyze?ticker=${encodeURIComponent(ticker.trim())}&swingN=${swingN}`);
+      const r = await fetch(`/api/analyze?ticker=${encodeURIComponent(symbol)}&swingN=${swingN}`);
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Request failed");
       setData(j);
+      setFetchedAt(new Date());
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
@@ -123,6 +128,11 @@ export default function App() {
 
   const cur = data?.currency || "";
   const fmt = (x, d = 2) => (x == null || isNaN(x) ? "—" : Number(x).toFixed(d));
+  // Absolute fetch timestamp, down to the second (date + HH:MM:SS).
+  const fmtFetched = (d) => (d ? d.toLocaleString(undefined, {
+    year: "numeric", month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }) : "—");
 
   return (
     <div style={{ background: COL.bg, color: COL.text, fontFamily: "Inter, system-ui, sans-serif", minHeight: "100vh", padding: "28px 20px 70px" }}>
@@ -154,7 +164,7 @@ export default function App() {
               <input type="range" min={1} max={5} value={swingN} onChange={(e) => setSwingN(+e.target.value)}
                 style={{ width: "100%", accentColor: COL.accent2 }} />
             </div>
-            <button onClick={run} disabled={loading}
+            <button onClick={() => run()} disabled={loading}
               style={{ cursor: loading ? "wait" : "pointer", background: COL.accent, color: "#0b0e14", border: "none",
                 borderRadius: 8, padding: "11px 22px", fontWeight: 700, fontSize: 14, fontFamily: "Inter, sans-serif" }}>
               {loading ? "Analyzing…" : "Analyze"}
@@ -179,13 +189,25 @@ export default function App() {
         {data && (
           <>
             {/* Stock header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
               <div>
                 <span style={{ fontSize: 20, fontWeight: 700 }}>{data.ticker}</span>
                 <span style={{ color: COL.muted, fontSize: 14, marginLeft: 10 }}>{data.name}</span>
+                <div style={{ fontSize: 12, color: COL.muted, fontFamily: "monospace", marginTop: 4 }}>
+                  {data.exchange} · last close {data.lastDate} · {cur}
+                </div>
               </div>
-              <div style={{ fontSize: 12, color: COL.muted, fontFamily: "monospace" }}>
-                {data.exchange} · last {data.lastDate} · {cur}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                <div style={{ textAlign: "right", lineHeight: 1.35, fontFamily: "monospace" }}>
+                  <div style={{ fontSize: 9.5, letterSpacing: "0.08em", textTransform: "uppercase", color: COL.muted }}>Data fetched</div>
+                  <div style={{ fontSize: 12, color: COL.text }}>{fmtFetched(fetchedAt)}</div>
+                </div>
+                <button onClick={() => run(data.ticker)} disabled={loading} title="Fetch the latest data for this ticker"
+                  style={{ cursor: loading ? "wait" : "pointer", background: COL.surface2, color: COL.text,
+                    border: `1px solid ${COL.border}`, borderRadius: 8, padding: "8px 14px", fontWeight: 600,
+                    fontSize: 13, fontFamily: "Inter, sans-serif", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+                  <span style={{ fontSize: 14 }}>↻</span> {loading ? "Refreshing…" : "Refresh"}
+                </button>
               </div>
             </div>
 
