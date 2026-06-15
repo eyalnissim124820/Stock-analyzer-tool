@@ -146,8 +146,8 @@ export default function App() {
 
         {/* Control bar */}
         <div style={{ background: COL.surface, border: `1px solid ${COL.border}`, borderRadius: 12, padding: 16, marginBottom: 22 }}>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
-            <div style={{ flex: 1, minWidth: 180 }}>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <div style={{ flex: 1, minWidth: 200 }}>
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: COL.muted, marginBottom: 6 }}>
                 Ticker (US, or TASE with .TA)
               </div>
@@ -157,12 +157,12 @@ export default function App() {
                 style={{ width: "100%", background: COL.surface2, border: `1px solid ${COL.border}`, color: COL.text,
                   borderRadius: 8, padding: "10px 12px", fontFamily: "monospace", fontSize: 15, outline: "none" }} />
             </div>
-            <div style={{ width: 150 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: COL.muted, marginBottom: 6 }}>
+            <div style={{ width: 200, flexShrink: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: COL.muted, marginBottom: 6, whiteSpace: "nowrap" }}>
                 Swing sensitivity: {swingN}
               </div>
               <input type="range" min={1} max={5} value={swingN} onChange={(e) => setSwingN(+e.target.value)}
-                style={{ width: "100%", accentColor: COL.accent2 }} />
+                style={{ width: "100%", accentColor: COL.accent2, display: "block" }} />
             </div>
             <button onClick={() => run()} disabled={loading}
               style={{ cursor: loading ? "wait" : "pointer", background: COL.accent, color: "#0b0e14", border: "none",
