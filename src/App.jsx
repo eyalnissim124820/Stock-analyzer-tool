@@ -46,12 +46,12 @@ const CHECK_TITLES = {
   P5: "Latest low above the previous low",
   Q1: "Peaks & troughs in a rising structure",
   Q2: "Volume expanded during the latest rise",
-  Q3: "Moving averages properly aligned",
+  Q3: "Moving averages aligned — green (13 SMA) over red (5 SMA)",
   Q4: "Broken resistance became support",
-  Q5: "Fall below the red line, red sloping down",
+  Q5: "Fall below the red line (5 SMA), red sloping down",
   Q6: "CCI(5) dropped below −100",
   Q7: "Correction candle below prior sequence low",
-  Q8: "Falling sequence broke up, close above red",
+  Q8: "Falling sequence broke up, close above red (5 SMA)",
   Q9: "Green buyer candle below lower Bollinger band",
 };
 
@@ -617,6 +617,7 @@ function Detail({ isMobile, stock, setOverride, refresh }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <span style={{ font: `700 20px ${FONT}`, color: "#fff" }}>{g.title}</span>
                 <span style={{ font: `700 12px ${FONT}`, letterSpacing: "0.08em", color: C.t50 }}>{g.caption}</span>
+                {g.caption === "PHASE A" && <MaLegend />}
               </div>
               {g.ids.map((id) => {
                 const ch = data.checks[id] || {};
@@ -726,6 +727,21 @@ function Detail({ isMobile, stock, setOverride, refresh }) {
       </div>
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 100, pointerEvents: "none", background: `linear-gradient(0deg, ${C.card} 0%, rgba(41,40,44,0) 100%)` }} />
     </>
+  );
+}
+
+// Clarifies what the two moving-average "lines" are, the first time they appear.
+function MaLegend() {
+  const dot = (color) => ({ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 });
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", marginTop: 4 }}>
+      <span style={{ display: "flex", alignItems: "center", gap: 6, font: `400 12px ${FONT}`, color: C.t70 }}>
+        <span style={dot(C.green)} />Green line = 13 SMA of price
+      </span>
+      <span style={{ display: "flex", alignItems: "center", gap: 6, font: `400 12px ${FONT}`, color: C.t70 }}>
+        <span style={dot(C.red)} />Red line = 5 SMA of the green line
+      </span>
+    </div>
   );
 }
 

@@ -49,12 +49,12 @@ const CHECK_TITLES = {
   P5: "השפל האחרון גבוה מהשפל הקודם",
   Q1: "פסגות ושפלים במבנה עולה",
   Q2: "המחזור התרחב בעלייה האחרונה",
-  Q3: "הממוצעים הנעים מסודרים נכון",
+  Q3: "הממוצעים הנעים מסודרים נכון — הירוק (SMA 13) מעל האדום (SMA 5)",
   Q4: "התנגדות שנשברה הפכה לתמיכה",
-  Q5: "ירידה מתחת לקו האדום, האדום במגמת ירידה",
+  Q5: "ירידה מתחת לקו האדום (SMA 5), האדום במגמת ירידה",
   Q6: "‏CCI(5)‎ ירד מתחת ל‎־100",
   Q7: "נר תיקון מתחת לשפל הרצף הקודם",
-  Q8: "הרצף היורד נשבר כלפי מעלה, סגירה מעל האדום",
+  Q8: "הרצף היורד נשבר כלפי מעלה, סגירה מעל האדום (SMA 5)",
   Q9: "נר קונים ירוק מתחת לרצועת בולינגר התחתונה",
 };
 
@@ -636,6 +636,7 @@ function Detail({ isMobile, stock, setOverride, refresh }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <span style={{ font: `700 20px ${FONT}`, color: "#fff" }}>{g.title}</span>
                 <span style={{ font: `700 12px ${FONT}`, letterSpacing: "0.08em", color: C.t50 }}>{g.caption}</span>
+                {g.ids.includes("Q3") && <MaLegend />}
               </div>
               {g.ids.map((id) => {
                 const ch = data.checks[id] || {};
@@ -745,6 +746,21 @@ function Detail({ isMobile, stock, setOverride, refresh }) {
       </div>
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 100, pointerEvents: "none", background: `linear-gradient(0deg, ${C.card} 0%, rgba(41,40,44,0) 100%)` }} />
     </>
+  );
+}
+
+// מבהיר מהם שני קווי הממוצע הנע, בפעם הראשונה שהם מופיעים.
+function MaLegend() {
+  const dot = (color) => ({ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 });
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", marginTop: 4 }}>
+      <span style={{ display: "flex", alignItems: "center", gap: 6, font: `400 12px ${FONT}`, color: C.t70 }}>
+        <span style={dot(C.green)} />קו ירוק = ממוצע נע 13 של המחיר
+      </span>
+      <span style={{ display: "flex", alignItems: "center", gap: 6, font: `400 12px ${FONT}`, color: C.t70 }}>
+        <span style={dot(C.red)} />קו אדום = ממוצע נע 5 של הקו הירוק
+      </span>
+    </div>
   );
 }
 
