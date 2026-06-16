@@ -211,6 +211,14 @@ export default function App() {
     e.target.value = ""; // reset so re-selecting the same file fires onChange again
   }
   function clearBatch() { setBatch(null); if (fileRef.current) fileRef.current.value = ""; }
+  function downloadDemoFile() {
+    const csv = "Ticker,Market,Resolutions\nAAPL,US,W\nNVDA,US,M\nTEVA,TLV,W\n0745,TLV,M\n";
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = "batch_analysis_example.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
   function scanAll() {
     if (!batch) return;
     const rows = batch.rows;
@@ -282,7 +290,7 @@ export default function App() {
         swingN={swingN} onSwing={onSwing}
         symbol={symbol} setSymbol={setSymbol} analyze={analyze}
         stocks={stocks} selectedId={selectedId} setSelectedId={setSelectedId} removeStock={removeStock}
-        onBatch={openBatch}
+        onBatch={openBatch} onDownloadDemo={downloadDemoFile}
       />
       <Main
         isMobile={isMobile}
@@ -330,11 +338,12 @@ function BatchModal({ batch, onScanAll, onCancel }) {
 }
 
 // ── Sidebar ─────────────────────────────────────────────────
-function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, onSwing, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId, removeStock, onBatch }) {
+function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, onSwing, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId, removeStock, onBatch, onDownloadDemo }) {
   const [tfHover, setTfHover] = useState(false);
   const [mkHover, setMkHover] = useState(false);
   const [anHover, setAnHover] = useState(false);
   const [batchHover, setBatchHover] = useState(false);
+  const [demoHover, setDemoHover] = useState(false);
   const [focus, setFocus] = useState(false);
 
   const ctlBtn = {
@@ -404,18 +413,32 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
       </div>
 
       {/* Batch analysis */}
-      <button
-        onClick={onBatch}
-        onMouseEnter={() => setBatchHover(true)} onMouseLeave={() => setBatchHover(false)}
-        title="Upload a CSV to scan many stocks at once"
-        style={{
-          display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-          background: C.card, borderRadius: 24, boxShadow: INSET, padding: "16px 20px", flexShrink: 0,
-          color: batchHover ? "#fff" : C.t70, font: `700 15px ${FONT}`, border: "none", cursor: "pointer",
-          transition: "color .12s",
-        }}>
-        <span style={{ font: `700 18px ${FONT}`, lineHeight: 1 }}>⬆</span> Batch analysis
-      </button>
+      <div style={{ display: "flex", gap: 12, flexShrink: 0 }}>
+        <button
+          onClick={onBatch}
+          onMouseEnter={() => setBatchHover(true)} onMouseLeave={() => setBatchHover(false)}
+          title="Upload a CSV to scan many stocks at once"
+          style={{
+            flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+            background: C.card, borderRadius: 24, boxShadow: INSET, padding: "16px 20px",
+            color: batchHover ? "#fff" : C.t70, font: `700 15px ${FONT}`, border: "none", cursor: "pointer",
+            transition: "color .12s",
+          }}>
+          <span style={{ font: `700 18px ${FONT}`, lineHeight: 1 }}>⬆</span> Batch analysis
+        </button>
+        <button
+          onClick={onDownloadDemo}
+          onMouseEnter={() => setDemoHover(true)} onMouseLeave={() => setDemoHover(false)}
+          title="Download an example CSV file"
+          style={{
+            flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            background: C.card, borderRadius: 24, boxShadow: INSET, padding: "16px 18px",
+            color: demoHover ? "#fff" : C.t50, font: `700 13px ${FONT}`, border: "none", cursor: "pointer",
+            transition: "color .12s", whiteSpace: "nowrap",
+          }}>
+          <span style={{ font: `400 16px ${FONT}`, lineHeight: 1 }}>⬇</span> Demo file
+        </button>
+      </div>
 
       {/* Stock list */}
       <div style={{
