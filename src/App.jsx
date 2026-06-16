@@ -189,6 +189,15 @@ export default function App() {
   const setOverride = (stockId, checkId, value) =>
     setStocks((prev) => prev.map((s) => s.id === stockId ? { ...s, overrides: { ...s.overrides, [checkId]: value } } : s));
 
+  // Remove a scan; if it was selected, fall back to the next remaining scan.
+  function removeStock(stockId) {
+    setStocks((prev) => {
+      const next = prev.filter((s) => s.id !== stockId);
+      if (stockId === selectedId) setSelectedId(next.length ? next[0].id : null);
+      return next;
+    });
+  }
+
   return (
     <div style={{
       display: "flex", flexDirection: isMobile ? "column" : "row", height: "100vh", width: "100%",
@@ -200,7 +209,7 @@ export default function App() {
         market={market} setMarket={setMarket}
         swingN={swingN} onSwing={onSwing}
         symbol={symbol} setSymbol={setSymbol} analyze={analyze}
-        stocks={stocks} selectedId={selectedId} setSelectedId={setSelectedId}
+        stocks={stocks} selectedId={selectedId} setSelectedId={setSelectedId} removeStock={removeStock}
       />
       <Main
         isMobile={isMobile}
@@ -213,7 +222,7 @@ export default function App() {
 }
 
 // ── Sidebar ─────────────────────────────────────────────────
-function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, onSwing, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId }) {
+function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, onSwing, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId, removeStock }) {
   const [tfHover, setTfHover] = useState(false);
   const [mkHover, setMkHover] = useState(false);
   const [anHover, setAnHover] = useState(false);
@@ -307,7 +316,8 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
             )}
             {g.rows.map((s) => (
               <StockRow key={s.id} s={s} timeframe={timeframe}
-                selected={s.id === selectedId} onClick={() => !s.loading && setSelectedId(s.id)} />
+                selected={s.id === selectedId} onClick={() => !s.loading && setSelectedId(s.id)}
+                onRemove={() => removeStock(s.id)} />
             ))}
           </React.Fragment>
         ))}
@@ -316,7 +326,9 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
   );
 }
 
-function StockRow({ s, timeframe, selected, onClick }) {
+function StockRow({ s, timeframe, selected, onClick, onRemove }) {
+  const [hover, setHover] = useState(false);
+  const [xHover, setXHover] = useState(false);
   let chipBg = C.card2;
   if (s.error) chipBg = C.red;
   else if (!s.loading && s.data) {
@@ -326,20 +338,36 @@ function StockRow({ s, timeframe, selected, onClick }) {
   const tf = (s.data && s.data.timeframe) || timeframe;
   const sub = s.error ? "Failed to analyze" : `${s.market} · ${tf} · ${s.data ? s.data.lastDate : "…"}`;
   return (
-    <div onClick={onClick} style={{
-      display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 20,
-      cursor: s.loading ? "default" : "pointer", transition: "background .12s",
-      background: selected ? "rgba(255,255,255,0.06)" : "transparent",
-    }}>
+    <div onClick={onClick}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => { setHover(false); setXHover(false); }}
+      style={{
+        position: "relative", display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 20,
+        cursor: s.loading ? "default" : "pointer", transition: "background .12s",
+        background: selected ? "rgba(255,255,255,0.06)" : hover ? "rgba(255,255,255,0.03)" : "transparent",
+      }}>
       <div style={{ width: 80, height: 43, flexShrink: 0, borderRadius: 8, background: chipBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <span style={{ font: `700 16px ${FONT}`, color: "#fff" }}>{s.display}</span>
       </div>
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4, paddingRight: hover ? 28 : 0 }}>
         <span style={{ font: `700 16px ${FONT}`, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</span>
         <span style={{ font: `400 12px ${FONT}`, color: s.error ? C.red : C.t50 }}>{sub}</span>
       </div>
       {s.loading && (
         <div style={{ width: 32, height: 32, flexShrink: 0, borderRadius: "50%", border: "3px solid #343238", borderTopColor: C.blue, animation: "spin .8s linear infinite" }} />
+      )}
+      {hover && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          onMouseEnter={() => setXHover(true)} onMouseLeave={() => setXHover(false)}
+          title="Remove scan" aria-label="Remove scan"
+          style={{
+            position: "absolute", top: 8, right: 8, width: 28, height: 28, borderRadius: "50%",
+            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+            background: xHover ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.35)",
+            boxShadow: `inset 0 0 0 1px ${xHover ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.25)"}`,
+            color: xHover ? "#fff" : C.t70, border: "none", font: `400 16px ${FONT}`, lineHeight: 1,
+            transition: "all .12s",
+          }}>×</button>
       )}
     </div>
   );
