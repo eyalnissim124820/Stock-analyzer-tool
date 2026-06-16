@@ -3,10 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>9-Question Method · Auto-Analyzer</title>
+    <title>Stock Analyzer · 9-Question Method</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
-    <style> html,body,#root{margin:0;height:100%;background:#0f1117} *{box-sizing:border-box;font-family:Inter,system-ui,sans-serif} input[type=range]{cursor:pointer} </style>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      * { box-sizing: border-box; }
+      html, body, #root { margin: 0; padding: 0; height: 100%; }
+      body { background: #1F1E21; font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      input::placeholder { color: rgba(255,255,255,0.4); font-weight: 700; letter-spacing: 0.04em; }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      input[type="range"] { cursor: pointer; accent-color: #6CD7A4; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
