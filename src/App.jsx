@@ -212,8 +212,62 @@ export default function App() {
   }
   function clearBatch() { setBatch(null); if (fileRef.current) fileRef.current.value = ""; }
   function scanAll() {
-    if (batch) for (const r of batch.rows) fetchStock({ rawSymbol: r.rawSymbol, market: r.market, tf: r.tf, n: swingN });
+    if (!batch) return;
+    const rows = batch.rows;
+    const n = swingN, tf = timeframe;
+
+    // Create all scans as loading stubs upfront
+    const ids = rows.map((r) => {
+      const id = `s${nextId.current++}`;
+      const display = cleanSymbol(r.rawSymbol);
+      const ticker = resolveTicker(r.rawSymbol, r.market);
+      return { id, display, ticker, market: r.market, name: nameGuess(display), row: r };
+    });
+
+    setStocks((prev) => [
+      ...ids.map((x) => ({
+        id: x.id, display: x.display, market: x.market, name: x.name, ticker: x.ticker,
+        loading: true, error: null, data: null, overrides: {}, fetchedAt: new Date(),
+      })),
+      ...prev,
+    ]);
     clearBatch();
+
+    // Queue them in batches of 5
+    processBatchQueue(ids, 0, n, tf);
+  }
+
+  // Fetch a batch of scans concurrently (max 5 at a time), then recursively process the next batch
+  async function processBatchQueue(ids, startIdx, n, tf) {
+    if (startIdx >= ids.length) return;
+
+    const batchItems = ids.slice(startIdx, startIdx + 5);
+    const results = await Promise.all(
+      batchItems.map((x) =>
+        fetch(`/api/analyze?ticker=${encodeURIComponent(x.ticker)}&swingN=${n}&timeframe=${encodeURIComponent(x.row.tf)}&market=${encodeURIComponent(x.market)}`)
+          .then((r) => r.json())
+          .then((j) => (!j.error ? { id: x.id, data: j } : { id: x.id, error: j.error || "Failed" }))
+          .catch((e) => ({ id: x.id, error: e.message }))
+      )
+    );
+
+    setStocks((prev) =>
+      prev.map((s) => {
+        const res = results.find((r) => r.id === s.id);
+        if (!res) return s;
+        return {
+          ...s,
+          loading: false,
+          error: res.error || null,
+          data: res.data || null,
+          name: res.data?.name || s.name,
+          fetchedAt: new Date(),
+        };
+      })
+    );
+
+    // Process next batch
+    processBatchQueue(ids, startIdx + 5, n, tf);
   }
 
   return (
