@@ -1,8 +1,9 @@
 // ─────────────────────────────────────────────────────────────
 // /api/analyze — Vercel serverless function.
-// GET /api/analyze?ticker=AAPL&swingN=2
-// Fetches ~90 daily candles from Yahoo (covers US + TASE via .TA),
-// runs the method engine, returns the filled-in analysis.
+// GET /api/analyze?ticker=AAPL&swingN=2&timeframe=Weekly
+// Fetches candles from Yahoo (covers US + TASE via .TA) at the
+// requested timeframe, runs the method engine, returns the
+// filled-in analysis.
 //
 // Runs server-side, so no API key is exposed and CORS is a non-issue.
 // NOTE: Yahoo's chart endpoint is unofficial. If Yahoo changes it,
@@ -11,10 +12,19 @@
 
 const { analyze, conclude } = require("./_engine.js");
 
-async function fetchCandles(ticker) {
+// Map the UI timeframe to Yahoo's interval + a range that yields
+// ~60–120 candles (the engine needs ~30+ to fill every check).
+const TIMEFRAMES = {
+  Daily:   { interval: "1d",  range: "6mo" },
+  Weekly:  { interval: "1wk", range: "2y" },
+  Monthly: { interval: "1mo", range: "5y" },
+};
+
+async function fetchCandles(ticker, timeframe) {
+  const tf = TIMEFRAMES[timeframe] || TIMEFRAMES.Daily;
   const url =
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}` +
-    `?range=6mo&interval=1d&includePrePost=false`;
+    `?range=${tf.range}&interval=${tf.interval}&includePrePost=false`;
   const res = await fetch(url, {
     headers: {
       "User-Agent":
@@ -55,10 +65,11 @@ async function fetchCandles(ticker) {
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "s-maxage=300"); // 5-min CDN cache
   try {
-    const { ticker, swingN } = req.query || {};
+    const { ticker, swingN, timeframe } = req.query || {};
     if (!ticker) return res.status(400).json({ error: "Missing ?ticker=" });
 
-    const data = await fetchCandles(String(ticker).trim().toUpperCase());
+    const tf = TIMEFRAMES[timeframe] ? timeframe : "Daily";
+    const data = await fetchCandles(String(ticker).trim().toUpperCase(), tf);
     const n = Math.max(1, Math.min(5, parseInt(swingN) || 2));
     const result = analyze(data.candles, {
       swingN: n,
@@ -74,6 +85,7 @@ module.exports = async (req, res) => {
       currency: data.currency,
       lastDate: data.lastDate,
       swingN: n,
+      timeframe: tf,
       checks: result.checks,
       math: result.math,
       conclusion: c,
