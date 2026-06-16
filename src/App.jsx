@@ -130,6 +130,8 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(null);
   const nextId = useRef(1);
   const swingTimer = useRef(null);
+  const fileRef = useRef(null);
+  const [batch, setBatch] = useState(null); // { rows:[{rawSymbol,market,tf}], fileName } while the popup is open
 
   const isMobile = useWindowWidth() < 920;
 
@@ -198,6 +200,22 @@ export default function App() {
     });
   }
 
+  // ── batch analysis (CSV upload) ──
+  function openBatch() { if (fileRef.current) fileRef.current.click(); }
+  function onBatchFile(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setBatch({ rows: parseBatchCsv(String(reader.result || "")), fileName: file.name });
+    reader.readAsText(file);
+    e.target.value = ""; // reset so re-selecting the same file fires onChange again
+  }
+  function clearBatch() { setBatch(null); if (fileRef.current) fileRef.current.value = ""; }
+  function scanAll() {
+    if (batch) for (const r of batch.rows) fetchStock({ rawSymbol: r.rawSymbol, market: r.market, tf: r.tf, n: swingN });
+    clearBatch();
+  }
+
   return (
     <div style={{
       display: "flex", flexDirection: isMobile ? "column" : "row", height: "100vh", width: "100%",
@@ -210,6 +228,7 @@ export default function App() {
         swingN={swingN} onSwing={onSwing}
         symbol={symbol} setSymbol={setSymbol} analyze={analyze}
         stocks={stocks} selectedId={selectedId} setSelectedId={setSelectedId} removeStock={removeStock}
+        onBatch={openBatch}
       />
       <Main
         isMobile={isMobile}
@@ -217,15 +236,51 @@ export default function App() {
         setOverride={setOverride}
         refresh={() => selected && fetchStock({ rawSymbol: selected.display, market: selected.market, tf: timeframe, n: swingN, existingId: selected.id })}
       />
+
+      <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onBatchFile} style={{ display: "none" }} />
+      {batch && <BatchModal batch={batch} onScanAll={scanAll} onCancel={clearBatch} />}
+    </div>
+  );
+}
+
+function BatchModal({ batch, onScanAll, onCancel }) {
+  const count = batch.rows.length;
+  const btn = {
+    display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 22px",
+    borderRadius: 16, font: `700 15px ${FONT}`, border: "none", cursor: "pointer", whiteSpace: "nowrap",
+  };
+  return (
+    <div onClick={onCancel} style={{
+      position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
+      background: "rgba(0,0,0,0.6)", padding: 20,
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        width: "100%", maxWidth: 440, background: C.card, borderRadius: 24,
+        boxShadow: `${INSET}, 0 24px 60px rgba(0,0,0,0.5)`, padding: 28,
+        display: "flex", flexDirection: "column", gap: 16,
+      }}>
+        <span style={{ font: `700 20px ${FONT}`, color: "#fff" }}>Batch analysis scan</span>
+        <span style={{ font: `400 14px ${FONT}`, color: C.t70, lineHeight: 1.6 }}>
+          <strong style={{ color: "#fff", fontWeight: 700 }}>{count}</strong> stock{count === 1 ? "" : "s"} {count === 1 ? "was" : "were"} found in <strong style={{ color: "#fff", fontWeight: 700 }}>{batch.fileName}</strong>. Uploading it will initiate the scan of all of them.
+        </span>
+        <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 4, flexWrap: "wrap" }}>
+          <button onClick={onCancel} style={{ ...btn, background: C.chip, color: "#fff" }}>Cancel</button>
+          <button onClick={onScanAll} disabled={count === 0}
+            style={{ ...btn, background: count === 0 ? "rgba(255,255,255,0.4)" : "#fff", color: C.card, cursor: count === 0 ? "not-allowed" : "pointer" }}>
+            Scan all
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
 // ── Sidebar ─────────────────────────────────────────────────
-function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, onSwing, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId, removeStock }) {
+function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, onSwing, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId, removeStock, onBatch }) {
   const [tfHover, setTfHover] = useState(false);
   const [mkHover, setMkHover] = useState(false);
   const [anHover, setAnHover] = useState(false);
+  const [batchHover, setBatchHover] = useState(false);
   const [focus, setFocus] = useState(false);
 
   const ctlBtn = {
@@ -293,6 +348,20 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
           style={{ flex: 1, minWidth: 0, accentColor: C.green }} />
         <span style={{ font: `700 16px ${FONT}`, color: "#fff", minWidth: 16, textAlign: "center" }}>{swingN}</span>
       </div>
+
+      {/* Batch analysis */}
+      <button
+        onClick={onBatch}
+        onMouseEnter={() => setBatchHover(true)} onMouseLeave={() => setBatchHover(false)}
+        title="Upload a CSV to scan many stocks at once"
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+          background: C.card, borderRadius: 24, boxShadow: INSET, padding: "16px 20px", flexShrink: 0,
+          color: batchHover ? "#fff" : C.t70, font: `700 15px ${FONT}`, border: "none", cursor: "pointer",
+          transition: "color .12s",
+        }}>
+        <span style={{ font: `700 18px ${FONT}`, lineHeight: 1 }}>⬆</span> Batch analysis
+      </button>
 
       {/* Stock list */}
       <div style={{
@@ -617,6 +686,31 @@ function MonCard({ title, color, items }) {
 }
 
 // ── helpers ─────────────────────────────────────────────────
+// Parse a batch CSV with columns Ticker, Market (US/TLV), Resolutions (W/M).
+// Tolerant of column order, optional header, quotes and blank lines.
+function parseBatchCsv(text) {
+  const split = (line) => line.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+  const lines = String(text || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return [];
+  const head = split(lines[0]).map((h) => h.toLowerCase());
+  const hasHeader = head.some((h) => h.startsWith("ticker"));
+  const find = (p, fallback) => { const i = head.findIndex((h) => h.startsWith(p)); return i >= 0 ? i : fallback; };
+  const ix = hasHeader
+    ? { ticker: find("ticker", 0), market: find("market", 1), res: find("resolution", 2) }
+    : { ticker: 0, market: 1, res: 2 };
+  const rows = [];
+  for (let i = hasHeader ? 1 : 0; i < lines.length; i++) {
+    const cols = split(lines[i]);
+    const rawSymbol = cleanSymbol(cols[ix.ticker] || "");
+    if (!rawSymbol) continue;
+    const m = (cols[ix.market] || "US").toUpperCase();
+    const market = m === "TLV" || m === "TA" || m === "TASE" ? "TLV" : "US";
+    const tf = (cols[ix.res] || "W").toUpperCase().startsWith("M") ? "Monthly" : "Weekly";
+    rows.push({ rawSymbol, market, tf });
+  }
+  return rows;
+}
+
 // Bare symbol the user sees vs. the suffixed symbol Yahoo needs.
 function cleanSymbol(raw) { return (raw || "").trim().toUpperCase().replace(/\.TA$/, ""); }
 function resolveTicker(raw, market) {
