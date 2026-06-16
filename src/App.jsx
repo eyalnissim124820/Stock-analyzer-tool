@@ -123,6 +123,7 @@ function Pill({ label, on, tint, onClick }) {
 // ── root component ──────────────────────────────────────────
 export default function App() {
   const [timeframe, setTimeframe] = useState("Weekly");
+  const [market, setMarket] = useState("US");
   const [symbol, setSymbol] = useState("");
   const [swingN, setSwingN] = useState(2);
   const [stocks, setStocks] = useState([]);     // analyzed stocks (newest first)
@@ -132,12 +133,14 @@ export default function App() {
 
   const isMobile = useWindowWidth() < 920;
 
-  // Fetch + store one ticker. `existingId` re-uses a row (refresh / param change).
-  async function fetchStock(sym, tf, n, existingId) {
-    const ticker = (sym || "").trim().toUpperCase();
-    if (!ticker) return;
+  // Fetch + store one scan. `existingId` re-uses a row (refresh / param change);
+  // `mkt` is the scan's market (US / TLV) and drives the ticker suffix.
+  async function fetchStock({ rawSymbol, market: mkt, tf, n, existingId }) {
+    const display = cleanSymbol(rawSymbol);
+    if (!display) return;
+    const ticker = resolveTicker(rawSymbol, mkt);
     const id = existingId || `s${nextId.current++}`;
-    const stub = { id, ticker, name: nameGuess(ticker), loading: true, error: null, data: null, overrides: {}, fetchedAt: new Date() };
+    const stub = { id, market: mkt, display, ticker, name: nameGuess(display), loading: true, error: null, data: null, overrides: {}, fetchedAt: new Date() };
 
     setStocks((prev) => {
       const idx = prev.findIndex((s) => s.id === id);
@@ -147,7 +150,7 @@ export default function App() {
     setSelectedId(id);
 
     try {
-      const r = await fetch(`/api/analyze?ticker=${encodeURIComponent(ticker)}&swingN=${n}&timeframe=${encodeURIComponent(tf)}`);
+      const r = await fetch(`/api/analyze?ticker=${encodeURIComponent(ticker)}&swingN=${n}&timeframe=${encodeURIComponent(tf)}&market=${encodeURIComponent(mkt)}`);
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Request failed");
       setStocks((prev) => prev.map((s) => s.id === id
@@ -159,26 +162,27 @@ export default function App() {
   }
 
   function analyze() {
-    const sym = symbol.trim().toUpperCase();
-    if (!sym) return;
-    fetchStock(sym, timeframe, swingN);
+    if (!symbol.trim()) return;
+    fetchStock({ rawSymbol: symbol, market, tf: timeframe, n: swingN });
     setSymbol("");
   }
 
   const selected = stocks.find((s) => s.id === selectedId) || null;
 
-  // Re-run the selected stock when the analysis parameters change, so the
-  // detail genuinely reflects the chosen timeframe / swing sensitivity.
+  // Re-run the selected scan when the analysis parameters change, so the detail
+  // genuinely reflects the chosen timeframe / swing sensitivity. A scan keeps its
+  // own market (not the current toggle) so refreshing a TLV scan stays TLV.
   function onTimeframe(tf) {
     setTimeframe(tf);
-    if (selected && !selected.loading && selected.data) fetchStock(selected.ticker, tf, swingN, selected.id);
+    if (selected && !selected.loading && selected.data)
+      fetchStock({ rawSymbol: selected.display, market: selected.market, tf, n: swingN, existingId: selected.id });
   }
   function onSwing(n) {
     setSwingN(n);
     if (swingTimer.current) clearTimeout(swingTimer.current);
     if (selected && !selected.loading && selected.data) {
-      const tkr = selected.ticker, id = selected.id;
-      swingTimer.current = setTimeout(() => fetchStock(tkr, timeframe, n, id), 450);
+      const { display, market: mkt, id } = selected;
+      swingTimer.current = setTimeout(() => fetchStock({ rawSymbol: display, market: mkt, tf: timeframe, n, existingId: id }), 450);
     }
   }
 
@@ -193,6 +197,7 @@ export default function App() {
       <Sidebar
         isMobile={isMobile}
         timeframe={timeframe} onTimeframe={onTimeframe}
+        market={market} setMarket={setMarket}
         swingN={swingN} onSwing={onSwing}
         symbol={symbol} setSymbol={setSymbol} analyze={analyze}
         stocks={stocks} selectedId={selectedId} setSelectedId={setSelectedId}
@@ -201,15 +206,16 @@ export default function App() {
         isMobile={isMobile}
         stock={selected}
         setOverride={setOverride}
-        refresh={() => selected && fetchStock(selected.ticker, timeframe, swingN, selected.id)}
+        refresh={() => selected && fetchStock({ rawSymbol: selected.display, market: selected.market, tf: timeframe, n: swingN, existingId: selected.id })}
       />
     </div>
   );
 }
 
 // ── Sidebar ─────────────────────────────────────────────────
-function Sidebar({ isMobile, timeframe, onTimeframe, swingN, onSwing, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId }) {
+function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, onSwing, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId }) {
   const [tfHover, setTfHover] = useState(false);
+  const [mkHover, setMkHover] = useState(false);
   const [anHover, setAnHover] = useState(false);
   const [focus, setFocus] = useState(false);
 
@@ -231,8 +237,15 @@ function Sidebar({ isMobile, timeframe, onTimeframe, swingN, onSwing, symbol, se
       {/* Control bar */}
       <div style={{
         display: "flex", alignItems: "center", gap: 12, background: C.card, borderRadius: 24,
-        boxShadow: INSET, padding: 16, flexShrink: 0,
+        boxShadow: INSET, padding: 16, flexShrink: 0, flexWrap: "wrap",
       }}>
+        <button
+          onClick={() => setMarket(market === "US" ? "TLV" : "US")}
+          onMouseEnter={() => setMkHover(true)} onMouseLeave={() => setMkHover(false)}
+          title="Select market — appends the right symbol suffix"
+          style={{ ...ctlBtn, background: mkHover ? "rgba(0,0,0,0.30)" : "rgba(0,0,0,0.18)" }}>
+          {market}
+        </button>
         <button
           onClick={() => onTimeframe(timeframe === "Weekly" ? "Monthly" : "Weekly")}
           onMouseEnter={() => setTfHover(true)} onMouseLeave={() => setTfHover(false)}
@@ -245,9 +258,9 @@ function Sidebar({ isMobile, timeframe, onTimeframe, swingN, onSwing, symbol, se
           onChange={(e) => setSymbol(e.target.value.toUpperCase())}
           onKeyDown={(e) => e.key === "Enter" && analyze()}
           onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
-          placeholder="SYMB" maxLength={6}
+          placeholder="SYMB" maxLength={8}
           style={{
-            flex: 1, minWidth: 0, height: 69, padding: "0 24px", borderRadius: 16,
+            flex: 1, minWidth: 120, height: 69, padding: "0 24px", borderRadius: 16,
             background: focus ? "rgba(0,0,0,0.30)" : "rgba(0,0,0,0.18)", color: "#fff",
             font: `700 18px ${FONT}`, border: "none", outline: "none", textAlign: "center",
             letterSpacing: "0.04em", boxShadow: focus ? "inset 0 0 0 2px #fff" : "none",
@@ -311,7 +324,7 @@ function StockRow({ s, timeframe, selected, onClick }) {
     chipBg = code === "DO_NOT_ENTER" ? C.red : code === "INCOMPLETE" ? C.card2 : C.green;
   }
   const tf = (s.data && s.data.timeframe) || timeframe;
-  const sub = s.error ? "Failed to analyze" : `${tf} · ${s.data ? s.data.lastDate : "…"}`;
+  const sub = s.error ? "Failed to analyze" : `${s.market} · ${tf} · ${s.data ? s.data.lastDate : "…"}`;
   return (
     <div onClick={onClick} style={{
       display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 20,
@@ -319,7 +332,7 @@ function StockRow({ s, timeframe, selected, onClick }) {
       background: selected ? "rgba(255,255,255,0.06)" : "transparent",
     }}>
       <div style={{ width: 80, height: 43, flexShrink: 0, borderRadius: 8, background: chipBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <span style={{ font: `700 16px ${FONT}`, color: "#fff" }}>{s.ticker}</span>
+        <span style={{ font: `700 16px ${FONT}`, color: "#fff" }}>{s.display}</span>
       </div>
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
         <span style={{ font: `700 16px ${FONT}`, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</span>
@@ -382,8 +395,9 @@ function Detail({ isMobile, stock, setOverride, refresh }) {
           padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap",
         }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 16, minWidth: 0, flexWrap: "wrap" }}>
-              <span style={{ font: `700 24px ${FONT}`, color: "#fff", flexShrink: 0 }}>{data.ticker}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flexWrap: "wrap" }}>
+              <span style={{ font: `700 24px ${FONT}`, color: "#fff", flexShrink: 0 }}>{stock.display}</span>
+              <span style={{ font: `700 11px ${FONT}`, letterSpacing: "0.08em", padding: "3px 10px", borderRadius: 40, background: C.chip, color: C.t70, flexShrink: 0 }}>{stock.market}</span>
               <span style={{ font: `400 24px ${FONT}`, color: C.t70, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{data.name}</span>
             </div>
             <span style={{ font: `400 12px ${FONT}`, color: C.t70 }}>
@@ -575,6 +589,13 @@ function MonCard({ title, color, items }) {
 }
 
 // ── helpers ─────────────────────────────────────────────────
+// Bare symbol the user sees vs. the suffixed symbol Yahoo needs.
+function cleanSymbol(raw) { return (raw || "").trim().toUpperCase().replace(/\.TA$/, ""); }
+function resolveTicker(raw, market) {
+  const s = cleanSymbol(raw);
+  return market === "TLV" ? `${s}.TA` : s;
+}
+
 function nameGuess(t) {
   const m = {
     AAPL: "Apple Inc.", NVDA: "NVIDIA Corporation", META: "Meta Platforms, Inc.", TSLA: "Tesla, Inc.",
