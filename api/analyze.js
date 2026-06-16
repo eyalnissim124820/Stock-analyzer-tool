@@ -20,6 +20,14 @@ const TIMEFRAMES = {
   Monthly: { interval: "1mo", range: "5y" },
 };
 
+// Append the exchange suffix Yahoo expects for the selected market.
+// Idempotent (strips any existing .TA first) so it matches the client's
+// resolveTicker and can't double-suffix even on direct API calls.
+function normalizeTicker(ticker, market) {
+  const s = String(ticker || "").trim().toUpperCase().replace(/\.TA$/, "");
+  return market === "TLV" ? `${s}.TA` : s;
+}
+
 async function fetchCandles(ticker, timeframe) {
   const tf = TIMEFRAMES[timeframe] || TIMEFRAMES.Daily;
   const url =
@@ -65,11 +73,12 @@ async function fetchCandles(ticker, timeframe) {
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "s-maxage=300"); // 5-min CDN cache
   try {
-    const { ticker, swingN, timeframe } = req.query || {};
+    const { ticker, swingN, timeframe, market } = req.query || {};
     if (!ticker) return res.status(400).json({ error: "Missing ?ticker=" });
 
     const tf = TIMEFRAMES[timeframe] ? timeframe : "Daily";
-    const data = await fetchCandles(String(ticker).trim().toUpperCase(), tf);
+    const symbol = normalizeTicker(ticker, market);
+    const data = await fetchCandles(symbol, tf);
     const n = Math.max(1, Math.min(5, parseInt(swingN) || 2));
     const result = analyze(data.candles, {
       swingN: n,
@@ -79,7 +88,8 @@ module.exports = async (req, res) => {
     const c = conclude(result);
 
     return res.status(200).json({
-      ticker: String(ticker).toUpperCase(),
+      ticker: symbol,
+      market: market === "TLV" ? "TLV" : "US",
       name: data.name,
       exchange: data.exchange,
       currency: data.currency,
