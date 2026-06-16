@@ -206,7 +206,7 @@ function analyze(candles, opts = {}) {
   const greenUp = green13[last] != null && green13[last - 1] != null && green13[last] > green13[last - 1];
   const redBelow = red[last] != null && green13[last] != null && red[last] < green13[last];
   put("Q3", greenUp && redBelow ? "yes" : "no", "exact",
-    `Green ${greenUp ? "rising" : "flat/down"}, red ${redBelow ? "below" : "above"} green`);
+    `Green line (13 SMA) ${greenUp ? "rising" : "flat/down"}, red line (5 SMA) ${redBelow ? "below" : "above"} green`);
 
   // Q4 — broken resistance became support. Best-guess (Tier 3).
   put("Q4", q4Guess(c, pivots), "guess",
@@ -221,7 +221,7 @@ function analyze(candles, opts = {}) {
   }
   const redDown = red[last] != null && red[last - 1] != null && red[last] < red[last - 1];
   put("Q5", belowRed && redDown ? "yes" : "no", "exact",
-    `Price ${belowRed ? "went below" : "stayed above"} red; red line ${redDown ? "sloping down" : "not down"}`);
+    `Price ${belowRed ? "went below" : "stayed above"} red line (5 SMA); red line ${redDown ? "sloping down" : "not down"}`);
 
   // Q6 — CCI(5) dropped below −100 during the correction
   let cciHit = false, cciMin = Infinity;
@@ -247,7 +247,7 @@ function analyze(candles, opts = {}) {
   }
   const k2 = red[last] != null && c.close[last] > red[last];
   put("Q8", (k1 || k2) ? "yes" : "no", "exact",
-    `${k1 ? "K1 break-up ✓ " : ""}${k2 ? "K2 close>red ✓" : (!k1 ? "neither K1 nor K2" : "")}`.trim());
+    `${k1 ? "K1 break-up ✓ " : ""}${k2 ? "K2 close > red line (5 SMA) ✓" : (!k1 ? "neither K1 nor K2" : "")}`.trim());
 
   // Q9 — green (K3) or buyer (K4) candle entirely below lower Bollinger band (10/1)
   let k3 = false, k4 = false;
