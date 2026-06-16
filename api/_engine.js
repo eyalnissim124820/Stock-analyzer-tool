@@ -9,6 +9,61 @@
 //   "guess"  — best-effort interpretation, needs human confirm (Q4)
 // ─────────────────────────────────────────────────────────────
 
+// ---------- localized "why" messages ----------
+// The math is language-agnostic; only the human-readable `why` line per check
+// is localized. English is kept byte-for-byte identical to the original so the
+// existing UI is unaffected; Hebrew is an idiomatic (not literal) rendering
+// using standard trading vocabulary. Number formatting is done by the caller
+// and passed in, so both languages share identical figures.
+const MSG = {
+  en: {
+    P1: (v) => `20-day avg volume ≈ ${v}`,
+    P2: (c, o) => `Last candle close ${c} vs open ${o}`,
+    P3yes: (u, b) => `Upper tail ${u} < 2× body ${b}`,
+    P3no: (u, b) => `Upper tail ${u} ≥ 2× body ${b} → seller`,
+    P4yes: () => `Recent closes not strictly descending`,
+    P4no: (n) => `Last ${n} closes each lower → falling`,
+    P5cmp: (a, b) => `Latest swing low ${a} vs previous ${b}`,
+    P5naRecent: () => `No falling sequence just broke`,
+    P5naFew: () => `Not enough swing lows to compare`,
+    Q1piv: (a, b, c, d) => `Peaks ${a}→${b}, troughs ${c}→${d}`,
+    Q1sparse: () => `Sparse pivots — coarse half-vs-half structure check; confirm visually`,
+    Q2: (rv, cv) => `Avg vol rise ≈ ${rv} vs correction ≈ ${cv}`,
+    Q2null: () => `Could not segment rise/correction`,
+    Q3: (up, below) => `Green ${up ? "rising" : "flat/down"}, red ${below ? "below" : "above"} green`,
+    Q4: () => `Auto-detected level — confirm visually: a prior ceiling that broke and then held as a floor`,
+    Q5: (below, down) => `Price ${below ? "went below" : "stayed above"} red; red line ${down ? "sloping down" : "not down"}`,
+    Q6: (m) => `Min CCI(5) in correction ≈ ${m ?? "n/a"} (need < −100)`,
+    Q7: (p, under) => `Prior sequence low ${p}; ${under ? "a candle closed entirely below it" : "no full undercut"}`,
+    Q7null: () => `Could not locate prior sequence low`,
+    Q8: (k1, k2) => `${k1 ? "K1 break-up ✓ " : ""}${k2 ? "K2 close>red ✓" : (!k1 ? "neither K1 nor K2" : "")}`.trim(),
+    Q9: (k3, k4) => `${k3 ? "K3 green<band ✓ " : ""}${k4 ? "K4 buyer<band ✓" : (!k3 ? "no candle fully below lower band" : "")}`.trim(),
+  },
+  he: {
+    P1: (v) => `מחזור ממוצע ל-20 ימים ≈ ${v}`,
+    P2: (c, o) => `סגירת הנר האחרון ${c} מול פתיחה ${o}`,
+    P3yes: (u, b) => `צל עליון ${u} < פי 2 מהגוף ${b}`,
+    P3no: (u, b) => `צל עליון ${u} ≥ פי 2 מהגוף ${b} ← נר מוכרים`,
+    P4yes: () => `הסגירות האחרונות אינן בירידה רציפה`,
+    P4no: (n) => `${n} הסגירות האחרונות יורדות ברצף ← רצף יורד`,
+    P5cmp: (a, b) => `שפל אחרון ${a} מול השפל הקודם ${b}`,
+    P5naRecent: () => `לא נשבר לאחרונה רצף יורד`,
+    P5naFew: () => `אין מספיק נקודות שפל להשוואה`,
+    Q1piv: (a, b, c, d) => `פסגות ${a}→${b}, שפלים ${c}→${d}`,
+    Q1sparse: () => `מעט נקודות מפנה — בדיקת מבנה גסה (מחצית מול מחצית); ודאו ויזואלית`,
+    Q2: (rv, cv) => `מחזור ממוצע בעלייה ≈ ${rv} מול בתיקון ≈ ${cv}`,
+    Q2null: () => `לא ניתן לבודד את העלייה/התיקון`,
+    Q3: (up, below) => `הקו הירוק ${up ? "עולה" : "שטוח/יורד"}, האדום ${below ? "מתחת" : "מעל"} לירוק`,
+    Q4: () => `רמה שזוהתה אוטומטית — ודאו ויזואלית: תקרה קודמת שנשברה והפכה לרצפה (תמיכה)`,
+    Q5: (below, down) => `המחיר ${below ? "ירד מתחת ל" : "נשאר מעל ה"}קו האדום; הקו האדום ${down ? "במגמת ירידה" : "אינו יורד"}`,
+    Q6: (m) => `CCI(5) מינימלי בתיקון ≈ ${m ?? "אין"} (נדרש < ‎−100)`,
+    Q7: (p, under) => `שפל הרצף הקודם ${p}; ${under ? "נר ירד כולו מתחתיו" : "אין חדירה מלאה מתחתיו"}`,
+    Q7null: () => `לא אותר שפל הרצף הקודם`,
+    Q8: (k1, k2) => `${k1 ? "K1 שבירה כלפי מעלה ✓ " : ""}${k2 ? "K2 סגירה מעל האדום ✓" : (!k1 ? "לא K1 ולא K2" : "")}`.trim(),
+    Q9: (k3, k4) => `${k3 ? "K3 נר ירוק מתחת לרצועה ✓ " : ""}${k4 ? "K4 נר קונים מתחת לרצועה ✓" : (!k3 ? "אין נר כולו מתחת לרצועה התחתונה" : "")}`.trim(),
+  },
+};
+
 // ---------- basic indicators ----------
 function smaSeries(vals, p) {
   const out = Array(vals.length).fill(null);
@@ -126,6 +181,7 @@ function segments(c, pivots) {
 function analyze(candles, opts = {}) {
   const swingN = opts.swingN ?? 2;
   const fallLen = opts.fallLen ?? 2; // consecutive lower closes = "falling sequence"
+  const M = MSG[opts.lang === "he" ? "he" : "en"]; // localized `why` strings
   const c = candles; // {open,high,low,close,volume} arrays, oldest→newest
   const N = c.close.length;
   const last = N - 1;
@@ -146,20 +202,20 @@ function analyze(candles, opts = {}) {
   // ===== PRE-FILTER =====
   const avgVol = c.volume.slice(-20).reduce((a, b) => a + b, 0) / Math.min(20, N);
   put("P1", avgVol > 1_000_000 ? "yes" : "no", "exact",
-    `20-day avg volume ≈ ${Math.round(avgVol).toLocaleString()}`);
+    M.P1(Math.round(avgVol).toLocaleString()));
 
   put("P2", lastK.green ? "yes" : "no", "exact",
-    `Last candle close ${lastK.c} vs open ${lastK.o}`);
+    M.P2(lastK.c, lastK.o));
 
   put("P3", isSeller(lastK) ? "no" : "yes", "exact",
-    isSeller(lastK) ? `Upper tail ${lastK.upper.toFixed(2)} ≥ 2× body ${lastK.body.toFixed(2)} → seller`
-      : `Upper tail ${lastK.upper.toFixed(2)} < 2× body ${lastK.body.toFixed(2)}`);
+    isSeller(lastK) ? M.P3no(lastK.upper.toFixed(2), lastK.body.toFixed(2))
+      : M.P3yes(lastK.upper.toFixed(2), lastK.body.toFixed(2)));
 
   // P4 — not in a falling sequence (last `fallLen` closes strictly lower-and-lower)
   let falling = true;
   for (let i = last; i > last - fallLen; i--) if (!(c.close[i] < c.close[i - 1])) falling = false;
   put("P4", falling ? "no" : "yes", "exact",
-    falling ? `Last ${fallLen} closes each lower → falling` : "Recent closes not strictly descending");
+    falling ? M.P4no(fallLen) : M.P4yes());
 
   // P5 — only if a fall just broke: latest swing low > previous swing low. Else N/A.
   const lows = pivots.pl;
@@ -169,9 +225,9 @@ function analyze(candles, opts = {}) {
     const recentlyBroke = last - a.i <= 6;
     if (recentlyBroke) {
       put("P5", a.price > b.price ? "yes" : "no", "swing",
-        `Latest swing low ${a.price.toFixed(2)} vs previous ${b.price.toFixed(2)}`);
-    } else put("P5", "na", "swing", "No falling sequence just broke");
-  } else put("P5", "na", "swing", "Not enough swing lows to compare");
+        M.P5cmp(a.price.toFixed(2), b.price.toFixed(2)));
+    } else put("P5", "na", "swing", M.P5naRecent());
+  } else put("P5", "na", "swing", M.P5naFew());
 
   // ===== PHASE A =====
   // Q1 — rising peaks AND rising troughs (last 2 of each)
@@ -180,7 +236,7 @@ function analyze(candles, opts = {}) {
     const risingPeaks = ph[ph.length - 1].price > ph[ph.length - 2].price;
     const risingTroughs = pl[pl.length - 1].price > pl[pl.length - 2].price;
     put("Q1", risingPeaks && risingTroughs ? "yes" : "no", "swing",
-      `Peaks ${ph[ph.length-2].price.toFixed(2)}→${ph[ph.length-1].price.toFixed(2)}, troughs ${pl[pl.length-2].price.toFixed(2)}→${pl[pl.length-1].price.toFixed(2)}`);
+      M.Q1piv(ph[ph.length-2].price.toFixed(2), ph[ph.length-1].price.toFixed(2), pl[pl.length-2].price.toFixed(2), pl[pl.length-1].price.toFixed(2)));
   } else {
     // Sparse pivots → compare first vs second half highs/lows as a coarse proxy.
     const mid = Math.floor(N / 2);
@@ -188,8 +244,7 @@ function analyze(candles, opts = {}) {
     const minOf = (arr, a, b) => Math.min(...arr.slice(a, b));
     const peakUp = maxOf(c.high, mid, N) > maxOf(c.high, 0, mid);
     const troughUp = minOf(c.low, mid, N) > minOf(c.low, 0, mid);
-    put("Q1", peakUp && troughUp ? "yes" : "no", "guess",
-      "Sparse pivots — coarse half-vs-half structure check; confirm visually");
+    put("Q1", peakUp && troughUp ? "yes" : "no", "guess", M.Q1sparse());
   }
 
   // Q2 — volume expanded on the last rise vs the correction
@@ -199,18 +254,17 @@ function analyze(candles, opts = {}) {
     const avg = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
     const rv = avg(riseVol), cv = avg(corrVol);
     put("Q2", rv > cv ? "yes" : "no", "swing",
-      `Avg vol rise ≈ ${Math.round(rv).toLocaleString()} vs correction ≈ ${Math.round(cv).toLocaleString()}`);
-  } else put("Q2", null, "swing", "Could not segment rise/correction");
+      M.Q2(Math.round(rv).toLocaleString(), Math.round(cv).toLocaleString()));
+  } else put("Q2", null, "swing", M.Q2null());
 
   // Q3 — green line sloping up AND red below green (at last bar)
   const greenUp = green13[last] != null && green13[last - 1] != null && green13[last] > green13[last - 1];
   const redBelow = red[last] != null && green13[last] != null && red[last] < green13[last];
   put("Q3", greenUp && redBelow ? "yes" : "no", "exact",
-    `Green ${greenUp ? "rising" : "flat/down"}, red ${redBelow ? "below" : "above"} green`);
+    M.Q3(greenUp, redBelow));
 
   // Q4 — broken resistance became support. Best-guess (Tier 3).
-  put("Q4", q4Guess(c, pivots), "guess",
-    "Auto-detected level — confirm visually: a prior ceiling that broke and then held as a floor");
+  put("Q4", q4Guess(c, pivots), "guess", M.Q4());
 
   // ===== PHASE B =====
   // Q5 — during correction, price below red line AND red line sloping down
@@ -221,22 +275,22 @@ function analyze(candles, opts = {}) {
   }
   const redDown = red[last] != null && red[last - 1] != null && red[last] < red[last - 1];
   put("Q5", belowRed && redDown ? "yes" : "no", "exact",
-    `Price ${belowRed ? "went below" : "stayed above"} red; red line ${redDown ? "sloping down" : "not down"}`);
+    M.Q5(belowRed, redDown));
 
   // Q6 — CCI(5) dropped below −100 during the correction
   let cciHit = false, cciMin = Infinity;
   const cStart = seg.highestHighIdx ?? Math.max(0, last - 15);
   for (let i = cStart; i <= last; i++) if (cci[i] != null) { cciMin = Math.min(cciMin, cci[i]); if (cci[i] < -100) cciHit = true; }
   put("Q6", cciHit ? "yes" : "no", "exact",
-    `Min CCI(5) in correction ≈ ${isFinite(cciMin) ? cciMin.toFixed(0) : "n/a"} (need < −100)`);
+    M.Q6(isFinite(cciMin) ? cciMin.toFixed(0) : null));
 
   // Q7 — ≥1 correction candle entirely below the prior sequence low (incl. tail)
   if (seg.priorSeqLow != null && seg.highestHighIdx != null) {
     let undercut = false;
     for (let i = seg.highestHighIdx + 1; i <= last; i++) if (c.high[i] < seg.priorSeqLow) { undercut = true; break; }
     put("Q7", undercut ? "yes" : "no", "swing",
-      `Prior sequence low ${seg.priorSeqLow.toFixed(2)}; ${undercut ? "a candle closed entirely below it" : "no full undercut"}`);
-  } else put("Q7", null, "swing", "Could not locate prior sequence low");
+      M.Q7(seg.priorSeqLow.toFixed(2), undercut));
+  } else put("Q7", null, "swing", M.Q7null());
 
   // ===== PHASE C ===== (only one Yes needed)
   // Q8 — K1: falling sequence broke up (close above prior falling candle's high)
@@ -246,8 +300,7 @@ function analyze(candles, opts = {}) {
     if (c.close[i - 1] < c.close[i - 2] && c.close[i] > c.high[i - 1]) { k1 = true; break; }
   }
   const k2 = red[last] != null && c.close[last] > red[last];
-  put("Q8", (k1 || k2) ? "yes" : "no", "exact",
-    `${k1 ? "K1 break-up ✓ " : ""}${k2 ? "K2 close>red ✓" : (!k1 ? "neither K1 nor K2" : "")}`.trim());
+  put("Q8", (k1 || k2) ? "yes" : "no", "exact", M.Q8(k1, k2));
 
   // Q9 — green (K3) or buyer (K4) candle entirely below lower Bollinger band (10/1)
   let k3 = false, k4 = false;
@@ -258,8 +311,7 @@ function analyze(candles, opts = {}) {
     if (entirelyBelow && kk.green) k3 = true;
     if (entirelyBelow && isBuyer(kk)) k4 = true;
   }
-  put("Q9", (k3 || k4) ? "yes" : "no", "exact",
-    `${k3 ? "K3 green<band ✓ " : ""}${k4 ? "K4 buyer<band ✓" : (!k3 ? "no candle fully below lower band" : "")}`.trim());
+  put("Q9", (k3 || k4) ? "yes" : "no", "exact", M.Q9(k3, k4));
 
   // ===== MATH =====
   const buy = c.close[last];

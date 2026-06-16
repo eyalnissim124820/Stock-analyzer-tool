@@ -73,7 +73,7 @@ async function fetchCandles(ticker, timeframe) {
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "s-maxage=300"); // 5-min CDN cache
   try {
-    const { ticker, swingN, timeframe, market } = req.query || {};
+    const { ticker, swingN, timeframe, market, lang } = req.query || {};
     if (!ticker) return res.status(400).json({ error: "Missing ?ticker=" });
 
     const tf = TIMEFRAMES[timeframe] ? timeframe : "Daily";
@@ -84,6 +84,7 @@ module.exports = async (req, res) => {
       swingN: n,
       lastDate: data.lastDate,
       currency: data.currency,
+      lang: lang === "he" ? "he" : "en",
     });
     const c = conclude(result);
 
