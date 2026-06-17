@@ -543,7 +543,7 @@ function StockRow({ s, timeframe, isMobile, selected, onClick, onRemove }) {
 // ── Main detail pane ────────────────────────────────────────
 function Main({ isMobile, onBack, stock, setOverride, refresh }) {
   return (
-    <main style={{ flex: 1, minWidth: 0, height: "100%", minHeight: 0, padding: isMobile ? "12px 12px 16px" : 20, boxSizing: "border-box", display: "flex", flexDirection: "column", gap: isMobile ? 10 : 0 }}>
+    <main style={{ flex: 1, minWidth: 0, height: "100%", minHeight: 0, padding: isMobile ? "12px 12px 16px" : 20, boxSizing: "border-box", display: "flex", flexDirection: "column", gap: isMobile ? 10 : 0, overflowX: isMobile ? "hidden" : undefined }}>
       {isMobile && (
         <button onClick={onBack} style={{
           flexShrink: 0, alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 8,
@@ -688,8 +688,8 @@ function Detail({ isMobile, stock, setOverride, refresh }) {
                 );
                 return isMobile ? (
                   // Mobile: [ID + title] on top row, pills on bottom row
-                  <div key={id} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                  <div key={id} style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 12, minWidth: 0 }}>
                       <div style={{ width: 42, height: 42, flexShrink: 0, borderRadius: 12, background: C.chip, display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <span style={{ font: `700 16px ${FONT}`, color: C.t50 }}>{id}</span>
                       </div>
@@ -699,7 +699,7 @@ function Detail({ isMobile, stock, setOverride, refresh }) {
                           <Badge conf={ch.conf} />
                           {edited && <span style={{ font: `700 10px ${FONT}`, letterSpacing: "0.08em", color: "#E0A458" }}>EDITED</span>}
                         </div>
-                        {ch.why && <span style={{ font: `400 12px ${FONT}`, color: C.t70, lineHeight: 1.4 }}>{ch.why}</span>}
+                        {ch.why && <span style={{ font: `400 12px ${FONT}`, color: C.t70, lineHeight: 1.4, overflowWrap: "break-word" }}>{ch.why}</span>}
                       </div>
                     </div>
                     {/* Pills indented to align under the title text */}
