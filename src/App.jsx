@@ -589,37 +589,64 @@ function Detail({ isMobile, stock, setOverride, refresh }) {
 
   return (
     <>
-      <div style={{ position: "absolute", inset: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 16, padding: 16 }}>
+      <div style={{ position: "absolute", inset: 0, overflowY: "auto", overflowX: "hidden", display: "flex", flexDirection: "column", gap: 16, padding: 16 }}>
 
         {/* Verdict header card */}
         <div style={{
           flexShrink: 0, borderRadius: 24, background: C.card2, boxShadow: `${INSET}, 0 12px 24px rgba(0,0,0,0.1)`,
-          padding: isMobile ? "16px 18px" : "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: isMobile ? 12 : 16, flexWrap: "wrap",
+          padding: isMobile ? "16px 18px" : "20px 24px",
+          display: "flex", flexDirection: isMobile ? "column" : "row",
+          justifyContent: isMobile ? "flex-start" : "space-between",
+          alignItems: isMobile ? "stretch" : "center",
+          gap: isMobile ? 12 : 16,
         }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
+          {/* Stock identity */}
+          <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? 6 : 12, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flexWrap: "wrap" }}>
               <span style={{ font: `700 ${isMobile ? 20 : 24}px ${FONT}`, color: "#fff", flexShrink: 0 }}>{stock.display}</span>
               <span style={{ font: `700 11px ${FONT}`, letterSpacing: "0.08em", padding: "3px 10px", borderRadius: 40, background: C.chip, color: C.t70, flexShrink: 0 }}>{stock.market}</span>
-              <span style={{ font: `400 ${isMobile ? 16 : 24}px ${FONT}`, color: C.t70, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{data.name}</span>
+              <span style={{ font: `400 ${isMobile ? 15 : 24}px ${FONT}`, color: C.t70, minWidth: 0, ...(isMobile ? {} : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }) }}>{data.name}</span>
             </div>
             <span style={{ font: `400 12px ${FONT}`, color: C.t70 }}>
               {data.exchange} · {data.timeframe} · last {data.lastDate} · {cur}
             </span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-            <div style={{ textAlign: "right", lineHeight: 1.35 }}>
-              <div style={{ font: `400 10px ${FONT}`, letterSpacing: "0.08em", textTransform: "uppercase", color: C.t50 }}>Fetched</div>
-              <div style={{ font: `400 12px ${FONT}`, color: C.t70 }}>{fetchedAt}</div>
+
+          {isMobile ? (
+            // Mobile: verdict pill full-width, then Fetched + Refresh on secondary row
+            <>
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 16px", borderRadius: 40,
+                background: vbg, color: "#fff", font: `700 16px ${FONT}`,
+              }}>{VLABEL[concl.code]}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>
+                  <div style={{ font: `400 10px ${FONT}`, letterSpacing: "0.08em", textTransform: "uppercase", color: C.t50 }}>Fetched</div>
+                  <div style={{ font: `400 12px ${FONT}`, color: C.t70 }}>{fetchedAt}</div>
+                </div>
+                <button onClick={refresh} title="Re-fetch the latest data" style={{
+                  flexShrink: 0, display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 40,
+                  background: C.chip, color: "#fff", font: `700 14px ${FONT}`, border: "none", cursor: "pointer", whiteSpace: "nowrap",
+                }}>↻ Refresh</button>
+              </div>
+            </>
+          ) : (
+            // Desktop: unchanged single right-side row
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+              <div style={{ textAlign: "right", lineHeight: 1.35 }}>
+                <div style={{ font: `400 10px ${FONT}`, letterSpacing: "0.08em", textTransform: "uppercase", color: C.t50 }}>Fetched</div>
+                <div style={{ font: `400 12px ${FONT}`, color: C.t70 }}>{fetchedAt}</div>
+              </div>
+              <button onClick={refresh} title="Re-fetch the latest data" style={{
+                display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 40,
+                background: C.chip, color: "#fff", font: `700 14px ${FONT}`, border: "none", cursor: "pointer", whiteSpace: "nowrap",
+              }}>↻ Refresh</button>
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "center", padding: "8px 16px", borderRadius: 40,
+                background: vbg, color: "#fff", font: `700 16px ${FONT}`, whiteSpace: "nowrap", flexShrink: 0,
+              }}>{VLABEL[concl.code]}</div>
             </div>
-            <button onClick={refresh} title="Re-fetch the latest data" style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 40,
-              background: C.chip, color: "#fff", font: `700 14px ${FONT}`, border: "none", cursor: "pointer", whiteSpace: "nowrap",
-            }}>↻ Refresh</button>
-            <div style={{
-              display: "flex", alignItems: "center", justifyContent: "center", padding: "8px 16px", borderRadius: 40,
-              background: vbg, color: "#fff", font: `700 16px ${FONT}`, whiteSpace: "nowrap", flexShrink: 0,
-            }}>{VLABEL[concl.code]}</div>
-          </div>
+          )}
         </div>
 
         {/* Risk / Reward / Ratio bar */}
