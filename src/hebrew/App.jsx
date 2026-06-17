@@ -111,11 +111,11 @@ function Badge({ conf }) {
   );
 }
 
-function Pill({ label, on, tint, onClick }) {
+function Pill({ label, on, tint, mobile, onClick }) {
   const base = {
     display: "flex", alignItems: "center", justifyContent: "center", padding: "8px 16px",
     borderRadius: 40, font: `700 16px ${FONT}`, cursor: "pointer", border: "none",
-    minWidth: 64, height: 35, transition: "all .12s", whiteSpace: "nowrap",
+    minWidth: mobile ? 72 : 64, height: mobile ? 44 : 35, transition: "all .12s", whiteSpace: "nowrap",
   };
   const style = on
     ? { ...base, background: tint, color: "#fff" }
@@ -671,8 +671,35 @@ function Detail({ isMobile, stock, setOverride, refresh }) {
                 const cval = v(id);
                 const edited = id in overrides;
                 const allowNA = id === "P5";
-                return (
-                  <div key={id} style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+                const pills = (
+                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                    <Pill label="כן" on={cval === "yes"} tint={C.green} mobile={isMobile} onClick={() => setOverride(stock.id, id, "yes")} />
+                    <Pill label="לא" on={cval === "no"} tint={C.red} mobile={isMobile} onClick={() => setOverride(stock.id, id, "no")} />
+                    {allowNA && <Pill label="לא רלוונטי" on={cval === "na"} tint="#7E8AA0" mobile={isMobile} onClick={() => setOverride(stock.id, id, "na")} />}
+                  </div>
+                );
+                return isMobile ? (
+                  // נייד: [תג + כותרת] בשורה עליונה, כפתורים בשורה תחתונה
+                  <div key={id} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                      <div style={{ width: 42, height: 42, flexShrink: 0, borderRadius: 12, background: C.chip, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <span dir="ltr" style={{ font: `700 16px ${FONT}`, color: C.t50 }}>{id}</span>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <span style={{ font: `700 15px ${FONT}`, color: "#fff", lineHeight: 1.3 }}>{CHECK_TITLES[id]}</span>
+                          <Badge conf={ch.conf} />
+                          {edited && <span style={{ font: `700 10px ${FONT}`, letterSpacing: "0.08em", color: "#E0A458" }}>נערך</span>}
+                        </div>
+                        {ch.why && <span style={{ font: `400 12px ${FONT}`, color: C.t70, lineHeight: 1.4 }}>{ch.why}</span>}
+                      </div>
+                    </div>
+                    {/* כפתורים מוזחים כדי להתיישר מתחת לטקסט הכותרת (RTL: paddingRight) */}
+                    <div style={{ paddingRight: 54 }}>{pills}</div>
+                  </div>
+                ) : (
+                  // דסקטופ: שורה אופקית אחת — ללא שינוי
+                  <div key={id} style={{ display: "flex", alignItems: "center", gap: 16 }}>
                     <div style={{ width: 42, height: 42, flexShrink: 0, borderRadius: 12, background: C.chip, display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <span dir="ltr" style={{ font: `700 16px ${FONT}`, color: C.t50 }}>{id}</span>
                     </div>
@@ -684,11 +711,7 @@ function Detail({ isMobile, stock, setOverride, refresh }) {
                       </div>
                       {ch.why && <span style={{ font: `400 12px ${FONT}`, color: C.t70 }}>{ch.why}</span>}
                     </div>
-                    <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                      <Pill label="כן" on={cval === "yes"} tint={C.green} onClick={() => setOverride(stock.id, id, "yes")} />
-                      <Pill label="לא" on={cval === "no"} tint={C.red} onClick={() => setOverride(stock.id, id, "no")} />
-                      {allowNA && <Pill label="לא רלוונטי" on={cval === "na"} tint="#7E8AA0" onClick={() => setOverride(stock.id, id, "na")} />}
-                    </div>
+                    {pills}
                   </div>
                 );
               })}
