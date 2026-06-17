@@ -130,7 +130,7 @@ function LangLink() {
     <a href="/" title="Switch to English" dir="ltr"
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{
-        position: "fixed", bottom: 14, left: 16, zIndex: 1001, display: "flex", alignItems: "center", gap: 6,
+        position: "fixed", bottom: "calc(14px + env(safe-area-inset-bottom))", left: "calc(16px + env(safe-area-inset-left))", zIndex: 1001, display: "flex", alignItems: "center", gap: 6,
         padding: "8px 14px", borderRadius: 40, background: C.card, boxShadow: INSET,
         color: hover ? "#fff" : C.t50, font: `700 13px ${FONT}`, textDecoration: "none", transition: "color .12s",
       }}>English ›</a>
@@ -145,6 +145,7 @@ export default function App() {
   const [swingN, setSwingN] = useState(2);
   const [stocks, setStocks] = useState([]);     // מניות שנותחו (החדשות בראש)
   const [selectedId, setSelectedId] = useState(null);
+  const [mobileDetail, setMobileDetail] = useState(false); // מובייל: תצוגת פירוט מול רשימה
   const nextId = useRef(1);
   const swingTimer = useRef(null);
   const fileRef = useRef(null);
@@ -184,7 +185,11 @@ export default function App() {
     if (!symbol.trim()) return;
     fetchStock({ rawSymbol: symbol, market, tf: timeframe, n: swingN });
     setSymbol("");
+    if (isMobile) setMobileDetail(true); // בנייד עוברים מיד לתצוגת הפירוט
   }
+
+  // בחירת מניה; בנייד עוברים לתצוגת הפירוט במסך מלא.
+  const selectStock = (id) => { setSelectedId(id); if (isMobile) setMobileDetail(true); };
 
   const selected = stocks.find((s) => s.id === selectedId) || null;
 
@@ -297,24 +302,32 @@ export default function App() {
 
   return (
     <div dir="rtl" style={{
-      display: "flex", flexDirection: isMobile ? "column" : "row", height: "100vh", width: "100%",
+      display: "flex", flexDirection: isMobile ? "column" : "row",
+      height: isMobile ? "100dvh" : "100vh", width: "100%",
       background: C.bg, fontFamily: FONT, color: C.text, overflow: "hidden",
+      ...(isMobile ? { paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" } : null),
     }}>
-      <Sidebar
-        isMobile={isMobile}
-        timeframe={timeframe} onTimeframe={onTimeframe}
-        market={market} setMarket={setMarket}
-        swingN={swingN} onSwing={onSwing}
-        symbol={symbol} setSymbol={setSymbol} analyze={analyze}
-        stocks={stocks} selectedId={selectedId} setSelectedId={setSelectedId} removeStock={removeStock}
-        onBatch={openBatch} onDownloadDemo={downloadDemoFile}
-      />
-      <Main
-        isMobile={isMobile}
-        stock={selected}
-        setOverride={setOverride}
-        refresh={() => selected && fetchStock({ rawSymbol: selected.display, market: selected.market, tf: timeframe, n: swingN, existingId: selected.id })}
-      />
+      {/* בנייד מוצגת תצוגה אחת בכל פעם (רשימה ↔ פירוט). בדסקטופ מוצגות שתיהן. */}
+      {(!isMobile || !mobileDetail) && (
+        <Sidebar
+          isMobile={isMobile}
+          timeframe={timeframe} onTimeframe={onTimeframe}
+          market={market} setMarket={setMarket}
+          swingN={swingN} onSwing={onSwing}
+          symbol={symbol} setSymbol={setSymbol} analyze={analyze}
+          stocks={stocks} selectedId={selectedId} setSelectedId={selectStock} removeStock={removeStock}
+          onBatch={openBatch} onDownloadDemo={downloadDemoFile}
+        />
+      )}
+      {(!isMobile || mobileDetail) && (
+        <Main
+          isMobile={isMobile}
+          onBack={() => setMobileDetail(false)}
+          stock={selected}
+          setOverride={setOverride}
+          refresh={() => selected && fetchStock({ rawSymbol: selected.display, market: selected.market, tf: timeframe, n: swingN, existingId: selected.id })}
+        />
+      )}
 
       <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onBatchFile} style={{ display: "none" }} />
       {batch && <BatchModal batch={batch} onScanAll={scanAll} onCancel={clearBatch} />}
@@ -365,19 +378,23 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
   const [demoHover, setDemoHover] = useState(false);
   const [focus, setFocus] = useState(false);
 
+  const ctlH = isMobile ? 56 : 69;
   const ctlBtn = {
-    display: "flex", alignItems: "center", justifyContent: "center", height: 69, padding: "0 24px",
+    display: "flex", alignItems: "center", justifyContent: "center", height: ctlH, padding: isMobile ? "0 16px" : "0 24px",
     borderRadius: 16, color: "#fff", font: `700 16px ${FONT}`, border: "none", cursor: "pointer",
     whiteSpace: "nowrap", flexShrink: 0, transition: "background .12s",
   };
+  // בנייד הכפתורים העליונים חולקים שורה, והשדה וכפתור הניתוח תופסים שורה מלאה כל אחד.
+  const mobileToggle = isMobile ? { flex: "1 1 0", minWidth: 0 } : null;
+  const mobileFull = isMobile ? { flex: "1 1 100%" } : null;
 
   const groups = groupByDay(stocks);
 
   return (
     <aside style={{
       width: isMobile ? "100%" : 640, flexShrink: 0,
-      height: isMobile ? "auto" : "100%", maxHeight: isMobile ? "48vh" : "100%",
-      display: "flex", flexDirection: "column", gap: 24,
+      height: "100%", maxHeight: "100%",
+      display: "flex", flexDirection: "column", gap: isMobile ? 16 : 24,
       padding: isMobile ? 16 : 36, boxSizing: "border-box",
     }}>
       {/* סרגל בקרה */}
@@ -389,14 +406,14 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
           onClick={() => setMarket(market === "US" ? "TLV" : "US")}
           onMouseEnter={() => setMkHover(true)} onMouseLeave={() => setMkHover(false)}
           title="בחירת שוק — מוסיף את סיומת הסימול המתאימה"
-          style={{ ...ctlBtn, background: mkHover ? "rgba(0,0,0,0.30)" : "rgba(0,0,0,0.18)" }}>
+          style={{ ...ctlBtn, ...mobileToggle, background: mkHover ? "rgba(0,0,0,0.30)" : "rgba(0,0,0,0.18)" }}>
           {MK_LABEL[market]}
         </button>
         <button
           onClick={() => onTimeframe(timeframe === "Weekly" ? "Monthly" : "Weekly")}
           onMouseEnter={() => setTfHover(true)} onMouseLeave={() => setTfHover(false)}
           title="החלפת טווח הנרות"
-          style={{ ...ctlBtn, background: tfHover ? "rgba(0,0,0,0.30)" : "rgba(0,0,0,0.18)" }}>
+          style={{ ...ctlBtn, ...mobileToggle, background: tfHover ? "rgba(0,0,0,0.30)" : "rgba(0,0,0,0.18)" }}>
           {TF_LABEL[timeframe]}
         </button>
         <input
@@ -406,15 +423,16 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
           onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
           placeholder="סימול" maxLength={8} dir="ltr"
           style={{
-            flex: 1, minWidth: 120, height: 69, padding: "0 24px", borderRadius: 16,
+            flex: 1, minWidth: isMobile ? 0 : 120, height: ctlH, padding: "0 24px", borderRadius: 16,
             background: focus ? "rgba(0,0,0,0.30)" : "rgba(0,0,0,0.18)", color: "#fff",
             font: `700 18px ${FONT}`, border: "none", outline: "none", textAlign: "center",
             letterSpacing: "0.04em", boxShadow: focus ? "inset 0 0 0 2px #fff" : "none",
+            ...mobileFull,
           }} />
         <button
           onClick={analyze}
           onMouseEnter={() => setAnHover(true)} onMouseLeave={() => setAnHover(false)}
-          style={{ ...ctlBtn, background: anHover ? "rgba(255,255,255,0.78)" : "#fff", color: C.card }}>
+          style={{ ...ctlBtn, ...mobileFull, background: anHover ? "rgba(255,255,255,0.78)" : "#fff", color: C.card }}>
           נתח
         </button>
       </div>
@@ -480,7 +498,7 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
               </>
             )}
             {g.rows.map((s) => (
-              <StockRow key={s.id} s={s} timeframe={timeframe}
+              <StockRow key={s.id} s={s} timeframe={timeframe} isMobile={isMobile}
                 selected={s.id === selectedId} onClick={() => !s.loading && setSelectedId(s.id)}
                 onRemove={() => removeStock(s.id)} />
             ))}
@@ -491,9 +509,12 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
   );
 }
 
-function StockRow({ s, timeframe, selected, onClick, onRemove }) {
+function StockRow({ s, timeframe, isMobile, selected, onClick, onRemove }) {
   const [hover, setHover] = useState(false);
   const [xHover, setXHover] = useState(false);
+  // במגע אין hover — שומרים על כפתור ההסרה נגיש (ומסתירים בזמן טעינה כדי שלא
+  // יתנגש עם הספינר). התנהגות ה-hover בדסקטופ נשמרת ללא שינוי.
+  const showX = isMobile ? !s.loading : hover;
   let chipBg = C.card2;
   if (s.error) chipBg = C.red;
   else if (!s.loading && s.data) {
@@ -513,14 +534,14 @@ function StockRow({ s, timeframe, selected, onClick, onRemove }) {
       <div style={{ width: 80, height: 43, flexShrink: 0, borderRadius: 8, background: chipBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <span dir="ltr" style={{ font: `700 16px ${FONT}`, color: "#fff" }}>{s.display}</span>
       </div>
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4, paddingLeft: hover ? 28 : 0 }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4, paddingLeft: showX ? 28 : 0 }}>
         <span style={{ font: `700 16px ${FONT}`, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</span>
         <span dir="ltr" style={{ font: `400 12px ${FONT}`, color: s.error ? C.red : C.t50, textAlign: "right" }}>{sub}</span>
       </div>
       {s.loading && (
         <div style={{ width: 32, height: 32, flexShrink: 0, borderRadius: "50%", border: "3px solid #343238", borderTopColor: C.blue, animation: "spin .8s linear infinite" }} />
       )}
-      {hover && (
+      {showX && (
         <button
           onClick={(e) => { e.stopPropagation(); onRemove(); }}
           onMouseEnter={() => setXHover(true)} onMouseLeave={() => setXHover(false)}
@@ -539,10 +560,17 @@ function StockRow({ s, timeframe, selected, onClick, onRemove }) {
 }
 
 // ── חלונית הפירוט הראשית ─────────────────────────────────────
-function Main({ isMobile, stock, setOverride, refresh }) {
+function Main({ isMobile, onBack, stock, setOverride, refresh }) {
   return (
-    <main style={{ flex: 1, minWidth: 0, height: isMobile ? "auto" : "100%", minHeight: 0, padding: isMobile ? "0 16px 16px" : 20, boxSizing: "border-box", display: "flex" }}>
-      <div style={{ flex: 1, minWidth: 0, position: "relative", borderRadius: isMobile ? 24 : 40, background: C.card, boxShadow: INSET, overflow: "hidden" }}>
+    <main style={{ flex: 1, minWidth: 0, height: "100%", minHeight: 0, padding: isMobile ? "12px 12px 16px" : 20, boxSizing: "border-box", display: "flex", flexDirection: "column", gap: isMobile ? 10 : 0 }}>
+      {isMobile && (
+        <button onClick={onBack} style={{
+          flexShrink: 0, alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 8,
+          padding: "10px 18px", borderRadius: 40, background: C.card, boxShadow: INSET,
+          color: C.t70, font: `700 14px ${FONT}`, border: "none", cursor: "pointer",
+        }}>רשימת המניות ›</button>
+      )}
+      <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: "relative", borderRadius: isMobile ? 24 : 40, background: C.card, boxShadow: INSET, overflow: "hidden" }}>
         {!stock || stock.loading || stock.error || !stock.data ? (
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center" }}>
             <span style={{ font: `700 16px ${FONT}`, color: stock && stock.error ? C.red : C.t25 }}>
@@ -585,13 +613,13 @@ function Detail({ isMobile, stock, setOverride, refresh }) {
         {/* כרטיס כותרת ההכרעה */}
         <div style={{
           flexShrink: 0, borderRadius: 24, background: C.card2, boxShadow: `${INSET}, 0 12px 24px rgba(0,0,0,0.1)`,
-          padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap",
+          padding: isMobile ? "16px 18px" : "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: isMobile ? 12 : 16, flexWrap: "wrap",
         }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flexWrap: "wrap" }}>
-              <span dir="ltr" style={{ font: `700 24px ${FONT}`, color: "#fff", flexShrink: 0 }}>{stock.display}</span>
+              <span dir="ltr" style={{ font: `700 ${isMobile ? 20 : 24}px ${FONT}`, color: "#fff", flexShrink: 0 }}>{stock.display}</span>
               <span style={{ font: `700 11px ${FONT}`, letterSpacing: "0.08em", padding: "3px 10px", borderRadius: 40, background: C.chip, color: C.t70, flexShrink: 0 }}>{MK_LABEL[stock.market] || stock.market}</span>
-              <span style={{ font: `400 24px ${FONT}`, color: C.t70, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{data.name}</span>
+              <span style={{ font: `400 ${isMobile ? 16 : 24}px ${FONT}`, color: C.t70, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{data.name}</span>
             </div>
             <span dir="ltr" style={{ font: `400 12px ${FONT}`, color: C.t70, textAlign: "right" }}>
               {data.exchange} · {TF_LABEL[data.timeframe] || data.timeframe} · {data.lastDate} · {cur}

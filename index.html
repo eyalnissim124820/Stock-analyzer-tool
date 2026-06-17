@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Stock Analyzer · 9-Question Method</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -21,7 +21,7 @@
   </head>
   <body>
     <div id="root"></div>
-    <a href="/hebrew" title="עברית" style="position:fixed;bottom:14px;right:16px;z-index:1001;display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:40px;background:#29282C;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);font:700 13px Inter,sans-serif;text-decoration:none;">‹ עברית</a>
+    <a href="/hebrew" title="עברית" style="position:fixed;bottom:calc(14px + env(safe-area-inset-bottom));right:calc(16px + env(safe-area-inset-right));z-index:1001;display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:40px;background:#29282C;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.1);color:rgba(255,255,255,0.5);font:700 13px Inter,sans-serif;text-decoration:none;">‹ עברית</a>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
