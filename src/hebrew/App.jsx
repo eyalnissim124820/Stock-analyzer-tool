@@ -562,7 +562,7 @@ function StockRow({ s, timeframe, isMobile, selected, onClick, onRemove }) {
 // ── חלונית הפירוט הראשית ─────────────────────────────────────
 function Main({ isMobile, onBack, stock, setOverride, refresh }) {
   return (
-    <main style={{ flex: 1, minWidth: 0, height: "100%", minHeight: 0, padding: isMobile ? "12px 12px 16px" : 20, boxSizing: "border-box", display: "flex", flexDirection: "column", gap: isMobile ? 10 : 0 }}>
+    <main style={{ flex: 1, minWidth: 0, height: "100%", minHeight: 0, padding: isMobile ? "12px 12px 16px" : 20, boxSizing: "border-box", display: "flex", flexDirection: "column", gap: isMobile ? 10 : 0, overflowX: isMobile ? "hidden" : undefined }}>
       {isMobile && (
         <button onClick={onBack} style={{
           flexShrink: 0, alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 8,
@@ -608,37 +608,64 @@ function Detail({ isMobile, stock, setOverride, refresh }) {
 
   return (
     <>
-      <div style={{ position: "absolute", inset: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 16, padding: 16 }}>
+      <div style={{ position: "absolute", inset: 0, overflowY: "auto", overflowX: "hidden", display: "flex", flexDirection: "column", gap: 16, padding: 16 }}>
 
         {/* כרטיס כותרת ההכרעה */}
         <div style={{
           flexShrink: 0, borderRadius: 24, background: C.card2, boxShadow: `${INSET}, 0 12px 24px rgba(0,0,0,0.1)`,
-          padding: isMobile ? "16px 18px" : "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: isMobile ? 12 : 16, flexWrap: "wrap",
+          padding: isMobile ? "16px 18px" : "20px 24px",
+          display: "flex", flexDirection: isMobile ? "column" : "row",
+          justifyContent: isMobile ? "flex-start" : "space-between",
+          alignItems: isMobile ? "stretch" : "center",
+          gap: isMobile ? 12 : 16,
         }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
+          {/* פרטי המניה */}
+          <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? 6 : 12, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flexWrap: "wrap" }}>
               <span dir="ltr" style={{ font: `700 ${isMobile ? 20 : 24}px ${FONT}`, color: "#fff", flexShrink: 0 }}>{stock.display}</span>
               <span style={{ font: `700 11px ${FONT}`, letterSpacing: "0.08em", padding: "3px 10px", borderRadius: 40, background: C.chip, color: C.t70, flexShrink: 0 }}>{MK_LABEL[stock.market] || stock.market}</span>
-              <span style={{ font: `400 ${isMobile ? 16 : 24}px ${FONT}`, color: C.t70, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{data.name}</span>
+              <span style={{ font: `400 ${isMobile ? 15 : 24}px ${FONT}`, color: C.t70, minWidth: 0, ...(isMobile ? {} : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }) }}>{data.name}</span>
             </div>
             <span dir="ltr" style={{ font: `400 12px ${FONT}`, color: C.t70, textAlign: "right" }}>
               {data.exchange} · {TF_LABEL[data.timeframe] || data.timeframe} · {data.lastDate} · {cur}
             </span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-            <div style={{ textAlign: "left", lineHeight: 1.35 }}>
-              <div style={{ font: `400 10px ${FONT}`, letterSpacing: "0.08em", textTransform: "uppercase", color: C.t50 }}>עודכן</div>
-              <div style={{ font: `400 12px ${FONT}`, color: C.t70 }}>{fetchedAt}</div>
+
+          {isMobile ? (
+            // נייד: פסיקה בולטת בשורה מלאה, עודכן + רענון בשורה משנית
+            <>
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 16px", borderRadius: 40,
+                background: vbg, color: "#fff", font: `700 16px ${FONT}`,
+              }}>{VLABEL[concl.code]}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button onClick={refresh} title="שליפת הנתונים העדכניים" style={{
+                  flexShrink: 0, display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 40,
+                  background: C.chip, color: "#fff", font: `700 14px ${FONT}`, border: "none", cursor: "pointer", whiteSpace: "nowrap",
+                }}>↻ רענון</button>
+                <div style={{ flex: 1, minWidth: 0, lineHeight: 1.35, textAlign: "left" }}>
+                  <div style={{ font: `400 10px ${FONT}`, letterSpacing: "0.08em", textTransform: "uppercase", color: C.t50 }}>עודכן</div>
+                  <div style={{ font: `400 12px ${FONT}`, color: C.t70 }}>{fetchedAt}</div>
+                </div>
+              </div>
+            </>
+          ) : (
+            // דסקטופ: שורת ימין ללא שינוי
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+              <div style={{ textAlign: "left", lineHeight: 1.35 }}>
+                <div style={{ font: `400 10px ${FONT}`, letterSpacing: "0.08em", textTransform: "uppercase", color: C.t50 }}>עודכן</div>
+                <div style={{ font: `400 12px ${FONT}`, color: C.t70 }}>{fetchedAt}</div>
+              </div>
+              <button onClick={refresh} title="שליפת הנתונים העדכניים" style={{
+                display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 40,
+                background: C.chip, color: "#fff", font: `700 14px ${FONT}`, border: "none", cursor: "pointer", whiteSpace: "nowrap",
+              }}>↻ רענון</button>
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "center", padding: "8px 16px", borderRadius: 40,
+                background: vbg, color: "#fff", font: `700 16px ${FONT}`, whiteSpace: "nowrap", flexShrink: 0,
+              }}>{VLABEL[concl.code]}</div>
             </div>
-            <button onClick={refresh} title="שליפת הנתונים העדכניים" style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 40,
-              background: C.chip, color: "#fff", font: `700 14px ${FONT}`, border: "none", cursor: "pointer", whiteSpace: "nowrap",
-            }}>↻ רענון</button>
-            <div style={{
-              display: "flex", alignItems: "center", justifyContent: "center", padding: "8px 16px", borderRadius: 40,
-              background: vbg, color: "#fff", font: `700 16px ${FONT}`, whiteSpace: "nowrap", flexShrink: 0,
-            }}>{VLABEL[concl.code]}</div>
-          </div>
+          )}
         </div>
 
         {/* סרגל סיכון / סיכוי / יחס */}
@@ -680,8 +707,8 @@ function Detail({ isMobile, stock, setOverride, refresh }) {
                 );
                 return isMobile ? (
                   // נייד: [תג + כותרת] בשורה עליונה, כפתורים בשורה תחתונה
-                  <div key={id} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                  <div key={id} style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 12, minWidth: 0 }}>
                       <div style={{ width: 42, height: 42, flexShrink: 0, borderRadius: 12, background: C.chip, display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <span dir="ltr" style={{ font: `700 16px ${FONT}`, color: C.t50 }}>{id}</span>
                       </div>
@@ -691,7 +718,7 @@ function Detail({ isMobile, stock, setOverride, refresh }) {
                           <Badge conf={ch.conf} />
                           {edited && <span style={{ font: `700 10px ${FONT}`, letterSpacing: "0.08em", color: "#E0A458" }}>נערך</span>}
                         </div>
-                        {ch.why && <span style={{ font: `400 12px ${FONT}`, color: C.t70, lineHeight: 1.4 }}>{ch.why}</span>}
+                        {ch.why && <span style={{ font: `400 12px ${FONT}`, color: C.t70, lineHeight: 1.4, overflowWrap: "break-word" }}>{ch.why}</span>}
                       </div>
                     </div>
                     {/* כפתורים מוזחים כדי להתיישר מתחת לטקסט הכותרת (RTL: paddingRight) */}
