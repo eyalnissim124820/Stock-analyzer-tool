@@ -3,7 +3,8 @@
   "buildCommand": "vite build",
   "outputDirectory": "dist",
   "functions": {
-    "api/analyze.js": { "maxDuration": 10 }
+    "api/analyze.js": { "maxDuration": 10 },
+    "api/resolve-tlv.js": { "maxDuration": 10 }
   },
   "rewrites": [
     { "source": "/hebrew", "destination": "/hebrew.html" }

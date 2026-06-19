@@ -164,11 +164,41 @@ export default function App() {
     }
   }
 
-  function analyze() {
-    if (!symbol.trim()) return;
-    fetchStock({ rawSymbol: symbol, market, tf: timeframe, n: swingN });
+  // When TLV is active and the input is all digits (5–9), treat it as a
+  // TASE paper number (מספר נייר): resolve → ticker first, then analyze.
+  async function fetchStockByPaperNumber(paperNumber) {
+    const id = `s${nextId.current++}`;
+    setStocks((prev) => [
+      { id, market: "TLV", display: paperNumber, ticker: paperNumber, name: paperNumber, loading: true, error: null, data: null, overrides: {}, fetchedAt: new Date() },
+      ...prev,
+    ]);
+    setSelectedId(id);
+
+    try {
+      const r = await fetch(`/api/resolve-tlv?code=${encodeURIComponent(paperNumber)}`);
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || `Cannot resolve paper number ${paperNumber}`);
+
+      const { ticker, name } = j;
+      setStocks((prev) => prev.map((s) =>
+        s.id === id ? { ...s, display: ticker, ticker: `${ticker}.TA`, name: name || ticker } : s
+      ));
+      await fetchStock({ rawSymbol: ticker, market: "TLV", tf: timeframe, n: swingN, existingId: id });
+    } catch (e) {
+      setStocks((prev) => prev.map((s) => s.id === id ? { ...s, loading: false, error: e.message } : s));
+    }
+  }
+
+  async function analyze() {
+    const raw = symbol.trim();
+    if (!raw) return;
     setSymbol("");
     if (isMobile) setMobileDetail(true); // jump to the detail view on phones
+    if (market === "TLV" && /^\d{5,9}$/.test(raw)) {
+      await fetchStockByPaperNumber(raw);
+    } else {
+      fetchStock({ rawSymbol: raw, market, tf: timeframe, n: swingN });
+    }
   }
 
   // Select a stock; on mobile, switch to the full-screen detail view.
@@ -402,7 +432,7 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
           onChange={(e) => setSymbol(e.target.value.toUpperCase())}
           onKeyDown={(e) => e.key === "Enter" && analyze()}
           onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
-          placeholder="SYMB" maxLength={8}
+          placeholder={market === "TLV" ? "SYMB / 1234567" : "SYMB"} maxLength={market === "TLV" ? 9 : 8}
           style={{
             flex: 1, minWidth: isMobile ? 0 : 120, height: ctlH, padding: "0 24px", borderRadius: 16,
             background: focus ? "rgba(0,0,0,0.30)" : "rgba(0,0,0,0.18)", color: "#fff",
