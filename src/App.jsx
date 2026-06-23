@@ -110,26 +110,46 @@ function Badge({ conf }) {
 
 // Small "?" affordance that reveals a styled explanation card on hover/focus.
 // Native title tooltips can't carry the multi-line explanation + examples we want.
+// Positioned with fixed coords computed from the trigger so it never clips the
+// window edges: it flips below the icon when there isn't room above, and clamps
+// horizontally into the viewport.
 function HelpTip({ title, children, width = 280 }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const btnRef = useRef(null);
+
+  const place = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const margin = 8, estH = 230;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const w = Math.min(width, vw - 2 * margin);
+    let left = r.left + r.width / 2 - w / 2;
+    left = Math.max(margin, Math.min(left, vw - w - margin));
+    // Prefer above; drop below the icon when the card wouldn't fit above the window.
+    const below = r.top < estH + 2 * margin;
+    const vert = below ? { top: Math.round(r.bottom + margin) } : { bottom: Math.round(vh - r.top + margin) };
+    setPos({ left: Math.round(left), width: w, ...vert });
+  };
+  const show = () => { place(); setOpen(true); };
+  const hide = () => setOpen(false);
+
   return (
-    <span
-      style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}
-      onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}
-    >
+    <span style={{ display: "inline-flex", flexShrink: 0 }}
+      onMouseEnter={show} onMouseLeave={hide}>
       <button
-        type="button" aria-label={title || "Help"}
-        onFocus={() => setOpen(true)} onBlur={() => setOpen(false)}
-        onClick={() => setOpen((o) => !o)}
+        type="button" aria-label={title || "Help"} ref={btnRef}
+        onFocus={show} onBlur={hide}
+        onClick={() => (open ? hide() : show())}
         style={{
           width: 18, height: 18, borderRadius: "50%", border: "none", cursor: "help",
           background: C.chip, color: C.t70, font: `700 12px ${FONT}`, lineHeight: "18px",
           padding: 0, display: "flex", alignItems: "center", justifyContent: "center",
         }}>?</button>
-      {open && (
+      {open && pos && (
         <span style={{
-          position: "absolute", bottom: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)",
-          width, maxWidth: "80vw", zIndex: 50, background: C.card2, color: C.t70,
+          position: "fixed", left: pos.left, top: pos.top, bottom: pos.bottom, width: pos.width,
+          zIndex: 1000, background: C.card2, color: C.t70,
           borderRadius: 12, padding: "12px 14px", boxShadow: `${INSET}, 0 12px 28px rgba(0,0,0,0.35)`,
           font: `400 12px ${FONT}`, lineHeight: 1.5, textAlign: "left", pointerEvents: "none",
         }}>
