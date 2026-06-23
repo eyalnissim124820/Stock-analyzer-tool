@@ -194,6 +194,77 @@ function Pill({ label, on, tint, mobile, onClick }) {
   return <button onClick={onClick} style={style}>{label}</button>;
 }
 
+// macOS-style right-click menu, opened at the cursor and clamped into the
+// viewport. Closes on outside click, Escape, scroll or resize. Clicks inside
+// stop propagation so the global "close on mousedown" listener doesn't fire
+// before a menu item's onClick runs.
+function ContextMenu({ x, y, items, onClose }) {
+  const ref = useRef(null);
+  const [pos, setPos] = useState({ left: x, top: y });
+
+  useEffect(() => {
+    const r = ref.current?.getBoundingClientRect();
+    const w = r?.width || 200, h = r?.height || 100, margin = 8;
+    setPos({
+      left: Math.max(margin, Math.min(x, window.innerWidth - w - margin)),
+      top: Math.max(margin, Math.min(y, window.innerHeight - h - margin)),
+    });
+  }, [x, y]);
+
+  useEffect(() => {
+    const close = () => onClose();
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("mousedown", close);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  return (
+    <div ref={ref}
+      onMouseDown={(e) => e.stopPropagation()}
+      onContextMenu={(e) => e.preventDefault()}
+      style={{
+        position: "fixed", left: pos.left, top: pos.top, zIndex: 1100, minWidth: 180,
+        background: C.card2, borderRadius: 12, padding: 6,
+        boxShadow: `${INSET}, 0 12px 28px rgba(0,0,0,0.45)`,
+        display: "flex", flexDirection: "column", gap: 2,
+      }}>
+      {items.map((it, i) => (
+        <ContextItem key={i} item={it} onClose={onClose} />
+      ))}
+    </div>
+  );
+}
+
+function ContextItem({ item, onClose }) {
+  const [hover, setHover] = useState(false);
+  const disabled = !!item.disabled;
+  const color = disabled ? C.t40 : item.danger ? C.red : "#fff";
+  return (
+    <button
+      disabled={disabled}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      onClick={() => { if (disabled) return; item.onClick(); onClose(); }}
+      style={{
+        display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
+        padding: "9px 12px", borderRadius: 8, border: "none",
+        cursor: disabled ? "not-allowed" : "pointer",
+        background: hover && !disabled ? "rgba(255,255,255,0.08)" : "transparent",
+        color, font: `600 14px ${FONT}`, whiteSpace: "nowrap",
+      }}>
+      {item.icon && <span style={{ font: `400 15px ${FONT}`, lineHeight: 1, width: 16, textAlign: "center" }}>{item.icon}</span>}
+      {item.label}
+    </button>
+  );
+}
+
 // ── root component ──────────────────────────────────────────
 export default function App() {
   const [timeframe, setTimeframe] = useState("Weekly");
@@ -207,6 +278,7 @@ export default function App() {
   const swingTimer = useRef(null);
   const fileRef = useRef(null);
   const [batch, setBatch] = useState(null); // { rows:[{rawSymbol,market,tf}], fileName } while the popup is open
+  const [menu, setMenu] = useState(null);   // { x, y, stock } — open right-click menu
 
   const isMobile = useWindowWidth() < 920;
 
@@ -277,6 +349,23 @@ export default function App() {
       if (stockId === selectedId) setSelectedId(next.length ? next[0].id : null);
       return next;
     });
+  }
+
+  // ── CSV export ──
+  // Export a single scan as its own CSV (right-click → Export).
+  function exportStock(stock) {
+    if (!stock) return;
+    downloadCsv(`${stock.display || "scan"}_${(stock.data && stock.data.timeframe) || timeframe}_${stamp()}.csv`, buildScansCsv([stock]));
+  }
+  // Export every scan into one CSV — one row per scan, all steps + data, no chart.
+  function exportAll() {
+    if (!stocks.length) return;
+    downloadCsv(`stock_scans_${stamp()}.csv`, buildScansCsv(stocks));
+  }
+  // Open the right-click menu for a scan row at the cursor.
+  function openMenu(e, stock) {
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY, stock });
   }
 
   // ── batch analysis (CSV upload) ──
@@ -374,6 +463,7 @@ export default function App() {
           symbol={symbol} setSymbol={setSymbol} analyze={analyze}
           stocks={stocks} selectedId={selectedId} setSelectedId={selectStock} removeStock={removeStock}
           onBatch={openBatch} onDownloadDemo={downloadDemoFile}
+          onExportAll={exportAll} onContext={openMenu}
         />
       )}
       {(!isMobile || mobileDetail) && (
@@ -388,6 +478,12 @@ export default function App() {
 
       <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onBatchFile} style={{ display: "none" }} />
       {batch && <BatchModal batch={batch} onScanAll={scanAll} onCancel={clearBatch} />}
+      {menu && (
+        <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)} items={[
+          { label: "Export", icon: "⬇", disabled: menu.stock.loading, onClick: () => exportStock(menu.stock) },
+          { label: "Remove", icon: "×", danger: true, onClick: () => removeStock(menu.stock.id) },
+        ]} />
+      )}
     </div>
   );
 }
@@ -425,12 +521,13 @@ function BatchModal({ batch, onScanAll, onCancel }) {
 }
 
 // ── Sidebar ─────────────────────────────────────────────────
-function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, onSwing, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId, removeStock, onBatch, onDownloadDemo }) {
+function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, onSwing, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId, removeStock, onBatch, onDownloadDemo, onExportAll, onContext }) {
   const [tfHover, setTfHover] = useState(false);
   const [mkHover, setMkHover] = useState(false);
   const [anHover, setAnHover] = useState(false);
   const [batchHover, setBatchHover] = useState(false);
   const [demoHover, setDemoHover] = useState(false);
+  const [exportHover, setExportHover] = useState(false);
   const [focus, setFocus] = useState(false);
 
   const ctlH = isMobile ? 56 : 69;
@@ -535,6 +632,22 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
         </button>
       </div>
 
+      {/* Export all scans → one CSV, one row per scan (no chart) */}
+      {stocks.length > 0 && (
+        <button
+          onClick={onExportAll}
+          onMouseEnter={() => setExportHover(true)} onMouseLeave={() => setExportHover(false)}
+          title="Download every scan as a single CSV (one row per scan)"
+          style={{
+            flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+            background: C.card, borderRadius: 24, boxShadow: INSET, padding: "16px 20px",
+            color: exportHover ? "#fff" : C.t70, font: `700 15px ${FONT}`, border: "none", cursor: "pointer",
+            transition: "color .12s",
+          }}>
+          <span style={{ font: `400 16px ${FONT}`, lineHeight: 1 }}>⬇</span> Export all scans
+        </button>
+      )}
+
       {/* Stock list */}
       <div style={{
         flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column",
@@ -558,7 +671,7 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
             {g.rows.map((s) => (
               <StockRow key={s.id} s={s} timeframe={timeframe} isMobile={isMobile}
                 selected={s.id === selectedId} onClick={() => !s.loading && setSelectedId(s.id)}
-                onRemove={() => removeStock(s.id)} />
+                onRemove={() => removeStock(s.id)} onContext={onContext} />
             ))}
           </React.Fragment>
         ))}
@@ -567,7 +680,7 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
   );
 }
 
-function StockRow({ s, timeframe, isMobile, selected, onClick, onRemove }) {
+function StockRow({ s, timeframe, isMobile, selected, onClick, onRemove, onContext }) {
   const [hover, setHover] = useState(false);
   const [xHover, setXHover] = useState(false);
   // Touch devices have no hover, so keep remove reachable (but hide it mid-load
@@ -583,6 +696,7 @@ function StockRow({ s, timeframe, isMobile, selected, onClick, onRemove }) {
   const sub = s.error ? "Failed to analyze" : `${s.market} · ${tf} · ${s.data ? s.data.lastDate : "…"}`;
   return (
     <div onClick={onClick}
+      onContextMenu={(e) => onContext && onContext(e, s)}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => { setHover(false); setXHover(false); }}
       style={{
         position: "relative", display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 20,
@@ -1301,6 +1415,84 @@ function MonCard({ title, color, items }) {
       ))}
     </div>
   );
+}
+
+// ── CSV export ──────────────────────────────────────────────
+// Flatten one scan into a row of columns: identity + verdict + the
+// risk/reward math + every check (the method's "steps") with its final
+// answer, confidence and evidence. The visual chart (candles / series /
+// pivots) is intentionally excluded.
+const EXPORT_CHECK_IDS = ["P1", "P2", "P3", "P4", "P5", "Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9"];
+const VAL_LABEL = { yes: "Yes", no: "No", na: "N/A" };
+
+function scanRecord(stock) {
+  const d = stock.data || {};
+  const o = stock.overrides || {};
+  const m = d.math || {};
+  const fv = (id) => (id in o ? o[id] : d.checks?.[id]?.value);  // final answer (override wins)
+  const num = (x, dec = 2) => (x == null || isNaN(x) ? "" : Number(x).toFixed(dec));
+  const concl = !stock.loading && !stock.error && d.checks ? verdict(d.checks, o, m) : null;
+
+  const rec = {
+    Symbol: stock.display || "",
+    Ticker: stock.ticker || "",
+    Market: stock.market || "",
+    Name: d.name || stock.name || "",
+    Exchange: d.exchange || "",
+    Currency: d.currency || "",
+    Timeframe: d.timeframe || "",
+    "Last candle": d.lastDate || "",
+    "Fetched at": stock.fetchedAt ? new Date(stock.fetchedAt).toISOString() : "",
+    "Swing sensitivity": d.swingN ?? "",
+    Status: stock.error ? "Error" : stock.loading ? "Loading" : "Analyzed",
+    Error: stock.error || "",
+    Verdict: concl ? VLABEL[concl.code] : "",
+    "Risk %": num(m.risk),
+    "Reward %": num(m.reward),
+    Ratio: num(m.ratio),
+    "Buy (last close)": num(m.buy),
+    "Candle low (stop)": num(m.candleLow),
+    "Highest high (target)": num(m.highestHigh),
+    "Max limit buy": num(m.maxBuy),
+    "Entry signal": (m.triggeredK || []).join(" "),
+  };
+  for (const id of EXPORT_CHECK_IDS) {
+    const ch = d.checks?.[id] || {};
+    rec[`${id} · ${CHECK_TITLES[id]}`] = VAL_LABEL[fv(id)] || "";
+    rec[`${id} confidence`] = ch.conf ? CONF[ch.conf]?.label || ch.conf : "";
+    rec[`${id} edited`] = id in o ? "Yes" : "";
+    rec[`${id} evidence`] = ch.why || "";
+  }
+  return rec;
+}
+
+function csvCell(val) {
+  const s = val == null ? "" : String(val);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+// One row per scan, all sharing one header (union of keys, first-seen order).
+function buildScansCsv(stocks) {
+  const records = stocks.map(scanRecord);
+  const cols = [];
+  const seen = new Set();
+  for (const r of records) for (const k of Object.keys(r)) if (!seen.has(k)) { seen.add(k); cols.push(k); }
+  const lines = [cols.map(csvCell).join(",")];
+  for (const r of records) lines.push(cols.map((c) => csvCell(r[c])).join(","));
+  return "﻿" + lines.join("\r\n"); // UTF-8 BOM so Excel reads non-ASCII correctly
+}
+
+function downloadCsv(filename, csv) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// Filesystem-safe timestamp (YYYY-MM-DD-HH-MM-SS) for export filenames.
+function stamp() {
+  return new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
 }
 
 // ── helpers ─────────────────────────────────────────────────
