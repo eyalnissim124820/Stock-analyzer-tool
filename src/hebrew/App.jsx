@@ -111,6 +111,60 @@ function Badge({ conf }) {
   );
 }
 
+// אייקון "?" שמציג בריחוף כרטיס הסבר מעוצב (title רגיל אינו תומך בטקסט מרובה
+// שורות עם דוגמאות).
+function HelpTip({ title, children, width = 280 }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span
+      style={{ position: "relative", display: "inline-flex", flexShrink: 0 }}
+      onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button" aria-label={title || "עזרה"}
+        onFocus={() => setOpen(true)} onBlur={() => setOpen(false)}
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          width: 18, height: 18, borderRadius: "50%", border: "none", cursor: "help",
+          background: C.chip, color: C.t70, font: `700 12px ${FONT}`, lineHeight: "18px",
+          padding: 0, display: "flex", alignItems: "center", justifyContent: "center",
+        }}>?</button>
+      {open && (
+        <span style={{
+          position: "absolute", bottom: "calc(100% + 8px)", right: "50%", transform: "translateX(50%)",
+          width, maxWidth: "80vw", zIndex: 50, background: C.card2, color: C.t70, direction: "rtl",
+          borderRadius: 12, padding: "12px 14px", boxShadow: `${INSET}, 0 12px 28px rgba(0,0,0,0.35)`,
+          font: `400 12px ${FONT}`, lineHeight: 1.6, textAlign: "right", pointerEvents: "none",
+        }}>
+          {title && <span style={{ display: "block", font: `700 13px ${FONT}`, color: "#fff", marginBottom: 6 }}>{title}</span>}
+          {children}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// טקסט ההסבר לרגישות הסווינג (בשימוש ב-HelpTip שבסרגל הצד).
+function SwingHelp() {
+  return (
+    <>
+      קובע כמה נרות בכל צד של נר צריכים להיות נמוכים יותר (לפסגה) או גבוהים יותר
+      (לשפל) כדי שייחשב כנקודת מפנה אמיתית.
+      <span style={{ display: "block", marginTop: 8, color: C.t50 }}>
+        <strong style={{ color: C.green, fontWeight: 700 }}>1</strong> — רגיש מאוד: מסמן הרבה
+        סווינגים קטנים (רועש יותר).<br />
+        <strong style={{ color: C.green, fontWeight: 700 }}>5</strong> — קפדני: רק נקודות מפנה
+        משמעותיות.<br />
+        ברירת המחדל היא <strong style={{ color: "#fff", fontWeight: 700 }}>2</strong>.
+      </span>
+      <span style={{ display: "block", marginTop: 8 }}>
+        נקודות אלו מזינות את Q1, P5, Q7 ואת יעד השיא (ולכן גם את אחוז התשואה). אם הסווינגים
+        שזוהו אינם תואמים את מה שהעין רואה — כווננו כאן.
+      </span>
+    </>
+  );
+}
+
 function Pill({ label, on, tint, mobile, onClick }) {
   const base = {
     display: "flex", alignItems: "center", justifyContent: "center", padding: "8px 16px",
@@ -442,7 +496,10 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
         display: "flex", alignItems: "center", gap: 16, background: C.card, borderRadius: 24,
         boxShadow: INSET, padding: "14px 20px", flexShrink: 0,
       }}>
-        <span style={{ font: `700 14px ${FONT}`, color: C.t70, whiteSpace: "nowrap" }}>רגישות סווינג</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+          <span style={{ font: `700 14px ${FONT}`, color: C.t70, whiteSpace: "nowrap" }}>רגישות סווינג</span>
+          <HelpTip title="רגישות סווינג"><SwingHelp /></HelpTip>
+        </span>
         <input type="range" min={1} max={5} value={swingN}
           onChange={(e) => onSwing(+e.target.value)}
           style={{ flex: 1, minWidth: 0, accentColor: C.green }} />
@@ -820,10 +877,220 @@ function Detail({ isMobile, stock, setOverride, refresh }) {
           </>
         )}
 
+        {/* גרף ניתוח טכני מופק */}
+        <AnalysisChart data={data} isMobile={isMobile} />
+
         <div style={{ height: 60, flexShrink: 0 }} />
       </div>
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 100, pointerEvents: "none", background: `linear-gradient(0deg, ${C.card} 0%, rgba(41,40,44,0) 100%)` }} />
     </>
+  );
+}
+
+// ── גרף נרות מופק ───────────────────────────────────────────
+// SVG בעבודת יד (ללא ספריית גרפים). מצייר את הנרות שנמשכו יחד עם הסדרות,
+// נקודות הסווינג והרמות שהמנוע חישב — כך שהתמונה משקפת את ההכרעה. בורר רמות
+// קובע את צפיפות השכבות; צלב כוונת מציג את נתוני הנר שמתחת לעכבר.
+const CHART_TIERS = [
+  { key: "Minimal", label: "מינימלי" },
+  { key: "Core", label: "רגיל" },
+  { key: "Full", label: "מלא" },
+];
+
+function AnalysisChart({ data, isMobile }) {
+  const [tier, setTier] = useState("Core");
+  const [hover, setHover] = useState(null);
+  const svgRef = useRef(null);
+
+  const candles = data.candles;
+  const series = data.series || {};
+  const dates = data.dates || [];
+  const piv = data.pivots || { ph: [], pl: [] };
+  const seg = data.segments || {};
+  const m = data.math || {};
+  if (!candles || !candles.close || candles.close.length === 0) return null;
+
+  const N = candles.close.length;
+  const last = N - 1;
+  const W = 720, H = isMobile ? 280 : 340;
+  const padL = 10, padR = 62, padT = 14, padB = 26;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const slot = plotW / N;
+  const bodyW = Math.max(1.2, Math.min(slot * 0.62, 13));
+
+  const showLevels = tier === "Core" || tier === "Full";
+  const showFull = tier === "Full";
+
+  let lo = Infinity, hi = -Infinity;
+  for (let i = 0; i < N; i++) { lo = Math.min(lo, candles.low[i]); hi = Math.max(hi, candles.high[i]); }
+  if (showLevels) for (const lvl of [m.buy, m.candleLow, m.highestHigh])
+    if (lvl != null) { lo = Math.min(lo, lvl); hi = Math.max(hi, lvl); }
+  if (showFull && series.bollLo) for (const b of series.bollLo) if (b != null) lo = Math.min(lo, b);
+  const padP = (hi - lo) * 0.06 || 1;
+  lo -= padP; hi += padP;
+  const span = hi - lo || 1;
+  const x = (i) => padL + slot * (i + 0.5);
+  const y = (p) => padT + ((hi - p) / span) * plotH;
+  const fmt = (v, d = 2) => (v == null || isNaN(v) ? "—" : Number(v).toFixed(d));
+
+  const polyline = (arr, color, w = 1.6, dash) => {
+    if (!arr) return null;
+    const pts = [];
+    for (let i = 0; i < N; i++) if (arr[i] != null) pts.push(`${x(i).toFixed(1)},${y(arr[i]).toFixed(1)}`);
+    if (pts.length < 2) return null;
+    return <polyline points={pts.join(" ")} fill="none" stroke={color} strokeWidth={w}
+      strokeDasharray={dash} strokeLinejoin="round" strokeLinecap="round" />;
+  };
+
+  const level = (price, color, label) => {
+    if (price == null) return null;
+    const yy = y(price);
+    return (
+      <g key={label}>
+        <line x1={padL} y1={yy} x2={padL + plotW} y2={yy} stroke={color} strokeWidth={1} strokeDasharray="5 4" opacity={0.9} />
+        <text x={padL + plotW + 4} y={yy + 3} fill={color} style={{ font: `700 10px ${FONT}` }}>{label}</text>
+        <text x={padL + plotW + 4} y={yy + 14} fill={C.t50} style={{ font: `400 9px ${FONT}` }}>{fmt(price)}</text>
+      </g>
+    );
+  };
+
+  function onMove(e) {
+    const r = svgRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const vbX = ((e.clientX - r.left) / r.width) * W;
+    let i = Math.round((vbX - padL) / slot - 0.5);
+    i = Math.max(0, Math.min(last, i));
+    setHover(i);
+  }
+
+  let tip = null;
+  if (hover != null) {
+    const k = (a) => a[hover];
+    const tw = 120, th = 78, gap = 10;
+    const hx = x(hover);
+    const tx = hx + gap + tw > padL + plotW ? hx - gap - tw : hx + gap;
+    const ty = padT + 4;
+    const rows = [
+      ["", dates[hover] || ""],
+      ["פ", fmt(k(candles.open))], ["ג", fmt(k(candles.high))],
+      ["נ", fmt(k(candles.low))], ["ס", fmt(k(candles.close))],
+    ];
+    tip = (
+      <g pointerEvents="none">
+        <line x1={hx} y1={padT} x2={hx} y2={padT + plotH} stroke={C.t40} strokeWidth={1} strokeDasharray="3 3" />
+        <rect x={tx} y={ty} width={tw} height={th} rx={8} fill={C.card2} stroke="rgba(255,255,255,0.12)" />
+        {rows.map(([lab, val], r) => (
+          <text key={r} x={tx + 9} y={ty + 16 + r * 14}
+            fill={lab ? C.t50 : "#fff"} style={{ font: `${lab ? 400 : 700} ${lab ? 10 : 11}px ${FONT}` }}>
+            {lab ? `${lab}  ` : ""}{val}
+          </text>
+        ))}
+      </g>
+    );
+  }
+
+  const grid = [0, 0.5, 1].map((f) => {
+    const p = lo + span * f, yy = y(p);
+    return (
+      <g key={f}>
+        <line x1={padL} y1={yy} x2={padL + plotW} y2={yy} stroke="rgba(255,255,255,0.05)" strokeWidth={1} />
+        <text x={padL + plotW + 4} y={yy + 3} fill={C.t40} style={{ font: `400 9px ${FONT}` }}>{fmt(p)}</text>
+      </g>
+    );
+  });
+
+  return (
+    <>
+      <div style={{ height: 1, background: C.line, margin: "8px 20px", flexShrink: 0 }} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "0 20px" }}>
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <span style={{ font: `700 20px ${FONT}`, color: "#fff" }}>גרף</span>
+            <span style={{ font: `700 12px ${FONT}`, letterSpacing: "0.08em", color: C.t50 }}>מופק מהנתונים</span>
+          </div>
+          <div style={{ display: "flex", gap: 4, background: C.sub, borderRadius: 40, padding: 4 }}>
+            {CHART_TIERS.map((t) => (
+              <button key={t.key} onClick={() => setTier(t.key)} style={{
+                font: `700 12px ${FONT}`, padding: "6px 12px", borderRadius: 40, border: "none", cursor: "pointer",
+                background: tier === t.key ? C.chip : "transparent", color: tier === t.key ? "#fff" : C.t50,
+              }}>{t.label}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ width: "100%", aspectRatio: `${W} / ${H}`, background: C.sub, borderRadius: 16, overflow: "hidden" }}>
+          <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} width="100%" height="100%"
+            onMouseMove={onMove} onMouseLeave={() => setHover(null)} style={{ display: "block", cursor: "crosshair" }}>
+            {grid}
+
+            {showFull && seg.highestHighIdx != null && (
+              <>
+                {seg.priorSeqLowIdx != null && (
+                  <rect x={x(seg.priorSeqLowIdx)} y={padT} width={Math.max(0, x(seg.highestHighIdx) - x(seg.priorSeqLowIdx))}
+                    height={plotH} fill={C.green} opacity={0.07} />
+                )}
+                <rect x={x(seg.highestHighIdx)} y={padT} width={Math.max(0, x(last) - x(seg.highestHighIdx))}
+                  height={plotH} fill={C.red} opacity={0.07} />
+              </>
+            )}
+
+            {Array.from({ length: N }, (_, i) => {
+              const o = candles.open[i], c = candles.close[i], h = candles.high[i], l = candles.low[i];
+              const up = c >= o, col = up ? C.green : C.red;
+              const yo = y(o), yc = y(c);
+              const top = Math.min(yo, yc), bh = Math.max(1, Math.abs(yc - yo));
+              return (
+                <g key={i}>
+                  <line x1={x(i)} y1={y(h)} x2={x(i)} y2={y(l)} stroke={col} strokeWidth={1} />
+                  <rect x={x(i) - bodyW / 2} y={top} width={bodyW} height={bh} fill={col} rx={0.5} />
+                </g>
+              );
+            })}
+
+            {showFull && polyline(series.bollLo, "#9AA0AE", 1, "4 3")}
+
+            {polyline(series.green13, C.green, 1.8)}
+            {polyline(series.red, C.red, 1.6)}
+
+            {showFull && (piv.ph || []).map((p, j) => (
+              <circle key={`ph${j}`} cx={x(p.i)} cy={y(p.price) - 5} r={2.4} fill={C.green} />
+            ))}
+            {showFull && (piv.pl || []).map((p, j) => (
+              <circle key={`pl${j}`} cx={x(p.i)} cy={y(p.price) + 5} r={2.4} fill={C.red} />
+            ))}
+
+            {showLevels && level(m.highestHigh, C.green, "יעד")}
+            {showLevels && level(m.buy, C.blue, "קנייה")}
+            {showLevels && level(m.candleLow, C.red, "סטופ")}
+
+            {[0, Math.floor(last / 2), last].map((i, j) => (
+              <text key={j} x={Math.min(Math.max(x(i), padL + 14), padL + plotW - 14)} y={H - 8}
+                textAnchor="middle" fill={C.t40} style={{ font: `400 9px ${FONT}` }}>{dates[i] || ""}</text>
+            ))}
+
+            {tip}
+          </svg>
+        </div>
+
+        <ChartLegend tier={tier} />
+      </div>
+    </>
+  );
+}
+
+function ChartLegend({ tier }) {
+  const dot = (color, round) => ({ width: 12, height: round ? 12 : 3, borderRadius: round ? "50%" : 2, background: color, flexShrink: 0 });
+  const item = (node, label) => (
+    <span style={{ display: "flex", alignItems: "center", gap: 6, font: `400 11px ${FONT}`, color: C.t70 }}>{node}{label}</span>
+  );
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px" }}>
+      {item(<span style={dot(C.green)} />, "קו ירוק (SMA 13)")}
+      {item(<span style={dot(C.red)} />, "קו אדום (SMA 5)")}
+      {tier !== "Minimal" && item(<span style={{ ...dot(C.blue), borderRadius: 0 }} />, "רמות קנייה / סטופ / יעד")}
+      {tier === "Full" && item(<span style={dot(C.green, true)} />, "נקודות סווינג")}
+      {tier === "Full" && item(<span style={dot("#9AA0AE")} />, "בולינגר תחתון (10/1)")}
+    </div>
   );
 }
 
