@@ -391,9 +391,9 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
           {market}
         </button>
         <button
-          onClick={() => onTimeframe(timeframe === "Weekly" ? "Monthly" : "Weekly")}
+          onClick={() => onTimeframe(timeframe === "Daily" ? "Weekly" : timeframe === "Weekly" ? "Monthly" : "Daily")}
           onMouseEnter={() => setTfHover(true)} onMouseLeave={() => setTfHover(false)}
-          title="Toggle candle timeframe"
+          title="Cycle candle timeframe — Daily → Weekly → Monthly"
           style={{ ...ctlBtn, ...mobileToggle, background: tfHover ? "rgba(0,0,0,0.30)" : "rgba(0,0,0,0.18)" }}>
           {timeframe}
         </button>
@@ -876,7 +876,8 @@ function parseBatchCsv(text) {
     if (!rawSymbol) continue;
     const m = (cols[ix.market] || "US").toUpperCase();
     const market = m === "TLV" || m === "TA" || m === "TASE" ? "TLV" : "US";
-    const tf = (cols[ix.res] || "W").toUpperCase().startsWith("M") ? "Monthly" : "Weekly";
+    const tfRaw = (cols[ix.res] || "W").toUpperCase();
+    const tf = tfRaw.startsWith("D") ? "Daily" : tfRaw.startsWith("M") ? "Monthly" : "Weekly";
     rows.push({ rawSymbol, market, tf });
   }
   return rows;
