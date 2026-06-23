@@ -871,13 +871,31 @@ function Detail({ isMobile, stock, setOverride, refresh }) {
 // ── Generated candlestick chart ─────────────────────────────
 // Hand-rolled SVG (no chart lib). Renders the fetched candles plus the engine's
 // own series/pivots/levels so the picture mirrors the verdict. A tier selector
-// dials the overlay density; a crosshair reads out the hovered candle.
+// dials the overlay density; a crosshair reads out the hovered candle; scroll
+// zooms and Shift-scroll / drag pans; Expand opens a full-view overlay.
 const CHART_TIERS = ["Minimal", "Core", "Full"];
 
-function AnalysisChart({ data, isMobile }) {
-  const [tier, setTier] = useState("Core");
+function TierSelector({ tier, setTier }) {
+  return (
+    <div style={{ display: "flex", gap: 4, background: C.sub, borderRadius: 40, padding: 4 }}>
+      {CHART_TIERS.map((t) => (
+        <button key={t} onClick={() => setTier(t)} style={{
+          font: `700 12px ${FONT}`, padding: "6px 12px", borderRadius: 40, border: "none", cursor: "pointer",
+          background: tier === t ? C.chip : "transparent", color: tier === t ? "#fff" : C.t50,
+        }}>{t}</button>
+      ))}
+    </div>
+  );
+}
+
+// The SVG plot itself, windowed on `view = {start, count}`. Owns its own pointer
+// interactions (hover crosshair, wheel zoom/pan, drag pan) so it can be mounted
+// twice (inline + expanded) at different W/H while sharing tier/view with the parent.
+function ChartCanvas({ data, tier, view, setView, W, H, maxH }) {
   const [hover, setHover] = useState(null);
+  const [dragging, setDragging] = useState(false);
   const svgRef = useRef(null);
+  const dragRef = useRef(null);
 
   const candles = data.candles;
   const series = data.series || {};
@@ -885,43 +903,48 @@ function AnalysisChart({ data, isMobile }) {
   const piv = data.pivots || { ph: [], pl: [] };
   const seg = data.segments || {};
   const m = data.math || {};
-  if (!candles || !candles.close || candles.close.length === 0) return null;
 
   const N = candles.close.length;
-  const last = N - 1;
-  const W = 720, H = isMobile ? 280 : 340;
   const padL = 10, padR = 62, padT = 14, padB = 26;
   const plotW = W - padL - padR, plotH = H - padT - padB;
-  const slot = plotW / N;
-  const bodyW = Math.max(1.2, Math.min(slot * 0.62, 13));
+
+  // Clamp the window to a valid range (the parent's view may briefly lag the data).
+  const count = Math.max(2, Math.min(view.count || N, N));
+  const start = Math.max(0, Math.min(view.start || 0, N - count));
+  const end = start + count;       // exclusive
+  const visLast = end - 1;
+  const slot = plotW / count;
+  const bodyW = Math.max(1.2, Math.min(slot * 0.62, 16));
 
   const showLevels = tier === "Core" || tier === "Full";
   const showFull = tier === "Full";
 
-  // Price range across everything currently drawn.
+  const x = (i) => padL + slot * ((i - start) + 0.5);
+  const xc = (i) => Math.max(padL, Math.min(padL + plotW, x(i)));
+  const fmt = (v, d = 2) => (v == null || isNaN(v) ? "—" : Number(v).toFixed(d));
+
+  // Price range auto-fits the visible candles (so zooming reveals detail).
   let lo = Infinity, hi = -Infinity;
-  for (let i = 0; i < N; i++) { lo = Math.min(lo, candles.low[i]); hi = Math.max(hi, candles.high[i]); }
-  if (showLevels) for (const lvl of [m.buy, m.candleLow, m.highestHigh])
-    if (lvl != null) { lo = Math.min(lo, lvl); hi = Math.max(hi, lvl); }
-  if (showFull && series.bollLo) for (const b of series.bollLo) if (b != null) lo = Math.min(lo, b);
+  for (let i = start; i < end; i++) { lo = Math.min(lo, candles.low[i]); hi = Math.max(hi, candles.high[i]); }
+  if (showFull && series.bollLo) for (let i = start; i < end; i++) if (series.bollLo[i] != null) lo = Math.min(lo, series.bollLo[i]);
+  if (!isFinite(lo)) { lo = 0; hi = 1; }
   const padP = (hi - lo) * 0.06 || 1;
   lo -= padP; hi += padP;
   const span = hi - lo || 1;
-  const x = (i) => padL + slot * (i + 0.5);
   const y = (p) => padT + ((hi - p) / span) * plotH;
-  const fmt = (v, d = 2) => (v == null || isNaN(v) ? "—" : Number(v).toFixed(d));
 
   const polyline = (arr, color, w = 1.6, dash) => {
     if (!arr) return null;
     const pts = [];
-    for (let i = 0; i < N; i++) if (arr[i] != null) pts.push(`${x(i).toFixed(1)},${y(arr[i]).toFixed(1)}`);
+    for (let i = start; i < end; i++) if (arr[i] != null) pts.push(`${x(i).toFixed(1)},${y(arr[i]).toFixed(1)}`);
     if (pts.length < 2) return null;
     return <polyline points={pts.join(" ")} fill="none" stroke={color} strokeWidth={w}
       strokeDasharray={dash} strokeLinejoin="round" strokeLinecap="round" />;
   };
 
+  // Trade level — only drawn when the price falls inside the visible y-range.
   const level = (price, color, label) => {
-    if (price == null) return null;
+    if (price == null || price < lo || price > hi) return null;
     const yy = y(price);
     return (
       <g key={label}>
@@ -932,18 +955,81 @@ function AnalysisChart({ data, isMobile }) {
     );
   };
 
-  function onMove(e) {
+  const clientToIdx = (clientX) => {
     const r = svgRef.current?.getBoundingClientRect();
-    if (!r) return;
-    const vbX = ((e.clientX - r.left) / r.width) * W;
-    let i = Math.round((vbX - padL) / slot - 0.5);
-    i = Math.max(0, Math.min(last, i));
-    setHover(i);
+    if (!r) return start;
+    const vbX = ((clientX - r.left) / r.width) * W;
+    let i = Math.round((vbX - padL) / slot - 0.5) + start;
+    return Math.max(start, Math.min(visLast, i));
+  };
+
+  function onMouseMove(e) {
+    if (dragRef.current) {
+      const r = svgRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const dxPx = e.clientX - dragRef.current.startX;
+      const dCandles = -Math.round((dxPx / r.width) * W / slot);
+      setView((v) => {
+        const cc = Math.max(2, Math.min(v.count, N));
+        const st = Math.max(0, Math.min(N - cc, dragRef.current.startStart + dCandles));
+        return { start: st, count: cc };
+      });
+      return; // suppress hover while panning
+    }
+    setHover(clientToIdx(e.clientX));
   }
+  function onMouseDown(e) {
+    dragRef.current = { startX: e.clientX, startStart: start };
+    setDragging(true);
+    setHover(null);
+  }
+  function endDrag() { dragRef.current = null; setDragging(false); }
+
+  // Release the drag even if the mouse comes up outside the SVG.
+  useEffect(() => {
+    if (!dragging) return;
+    const up = () => endDrag();
+    window.addEventListener("mouseup", up);
+    return () => window.removeEventListener("mouseup", up);
+  }, [dragging]);
+
+  // Wheel zoom / pan. React's onWheel is passive, so attach a non-passive
+  // native listener to call preventDefault() and stop the page from scrolling.
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const onWheel = (e) => {
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      const vbX = ((e.clientX - r.left) / r.width) * W;
+      const plotFrac = Math.max(0, Math.min(1, (vbX - padL) / plotW));
+      const horizontal = e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
+      if (horizontal) {
+        const delta = e.deltaX || e.deltaY;
+        setView((v) => {
+          const cc = Math.max(2, Math.min(v.count, N));
+          const step = Math.sign(delta) * Math.max(1, Math.round(cc * 0.06));
+          return { start: Math.max(0, Math.min(N - cc, v.start + step)), count: cc };
+        });
+      } else {
+        const factor = Math.exp(e.deltaY * 0.0015);
+        setView((v) => {
+          const minC = Math.min(N, 8), maxC = N;
+          let cc = Math.max(minC, Math.min(maxC, Math.round((v.count || N) * factor)));
+          const pointer = (v.start || 0) + plotFrac * (v.count || N);
+          let st = Math.round(pointer - plotFrac * cc);
+          st = Math.max(0, Math.min(N - cc, st));
+          return { start: st, count: cc };
+        });
+      }
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [N, W, plotW, setView]);
 
   // Hover tooltip geometry (flip to the left near the right edge).
   let tip = null;
-  if (hover != null) {
+  if (hover != null && hover >= start && hover < end) {
     const k = (a) => a[hover];
     const tw = 120, th = 78, gap = 10;
     const hx = x(hover);
@@ -961,7 +1047,7 @@ function AnalysisChart({ data, isMobile }) {
         {rows.map(([lab, val], r) => (
           <text key={r} x={tx + 9} y={ty + 16 + r * 14}
             fill={lab ? C.t50 : "#fff"} style={{ font: `${lab ? 400 : 700} ${lab ? 10 : 11}px ${FONT}` }}>
-            {lab ? `${lab}  ` : ""}<tspan fill={lab ? "#fff" : "#fff"}>{val}</tspan>
+            {lab ? `${lab}  ` : ""}<tspan fill="#fff">{val}</tspan>
           </text>
         ))}
       </g>
@@ -979,6 +1065,104 @@ function AnalysisChart({ data, isMobile }) {
     );
   });
 
+  const axisIdx = [start, Math.floor((start + visLast) / 2), visLast];
+
+  return (
+    <div style={{ width: "100%", aspectRatio: `${W} / ${H}`, maxHeight: maxH, background: C.sub, borderRadius: 16, overflow: "hidden" }}>
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} width="100%" height="100%"
+        onMouseMove={onMouseMove} onMouseDown={onMouseDown} onMouseUp={endDrag}
+        onMouseLeave={() => { setHover(null); endDrag(); }}
+        style={{ display: "block", cursor: dragging ? "grabbing" : "grab", touchAction: "none" }}>
+        {grid}
+
+        {/* Full: shade the rise (green) and correction (red) segments. */}
+        {showFull && seg.highestHighIdx != null && (
+          <>
+            {seg.priorSeqLowIdx != null && (
+              <rect x={xc(seg.priorSeqLowIdx)} y={padT} width={Math.max(0, xc(seg.highestHighIdx) - xc(seg.priorSeqLowIdx))}
+                height={plotH} fill={C.green} opacity={0.07} />
+            )}
+            <rect x={xc(seg.highestHighIdx)} y={padT} width={Math.max(0, xc(visLast) - xc(seg.highestHighIdx))}
+              height={plotH} fill={C.red} opacity={0.07} />
+          </>
+        )}
+
+        {/* Candles (visible window only) */}
+        {Array.from({ length: count }, (_, j) => {
+          const i = start + j;
+          const o = candles.open[i], c = candles.close[i], h = candles.high[i], l = candles.low[i];
+          const up = c >= o, col = up ? C.green : C.red;
+          const yo = y(o), yc = y(c);
+          const top = Math.min(yo, yc), bh = Math.max(1, Math.abs(yc - yo));
+          return (
+            <g key={i}>
+              <line x1={x(i)} y1={y(h)} x2={x(i)} y2={y(l)} stroke={col} strokeWidth={1} />
+              <rect x={x(i) - bodyW / 2} y={top} width={bodyW} height={bh} fill={col} rx={0.5} />
+            </g>
+          );
+        })}
+
+        {/* Full: lower Bollinger band */}
+        {showFull && polyline(series.bollLo, "#9AA0AE", 1, "4 3")}
+
+        {/* Moving averages (all tiers) */}
+        {polyline(series.green13, C.green, 1.8)}
+        {polyline(series.red, C.red, 1.6)}
+
+        {/* Full: swing pivot dots (visible window only) */}
+        {showFull && (piv.ph || []).filter((p) => p.i >= start && p.i < end).map((p, j) => (
+          <circle key={`ph${j}`} cx={x(p.i)} cy={y(p.price) - 5} r={2.4} fill={C.green} />
+        ))}
+        {showFull && (piv.pl || []).filter((p) => p.i >= start && p.i < end).map((p, j) => (
+          <circle key={`pl${j}`} cx={x(p.i)} cy={y(p.price) + 5} r={2.4} fill={C.red} />
+        ))}
+
+        {/* Core+: trade levels */}
+        {showLevels && level(m.highestHigh, C.green, "Target")}
+        {showLevels && level(m.buy, C.blue, "Buy")}
+        {showLevels && level(m.candleLow, C.red, "Stop")}
+
+        {/* Date axis */}
+        {axisIdx.map((i, j) => (
+          <text key={j} x={Math.min(Math.max(x(i), padL + 14), padL + plotW - 14)} y={H - 8}
+            textAnchor="middle" fill={C.t40} style={{ font: `400 9px ${FONT}` }}>{dates[i] || ""}</text>
+        ))}
+
+        {tip}
+      </svg>
+    </div>
+  );
+}
+
+function AnalysisChart({ data, isMobile }) {
+  const [tier, setTier] = useState("Core");
+  const [expanded, setExpanded] = useState(false);
+  const N = data?.candles?.close?.length || 0;
+  const [view, setView] = useState({ start: 0, count: N });
+
+  // Reset the zoom window whenever the underlying scan changes.
+  useEffect(() => { setView({ start: 0, count: N }); }, [data, N]);
+
+  // Esc closes the expand overlay.
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e) => { if (e.key === "Escape") setExpanded(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expanded]);
+
+  if (!N) return null;
+
+  const expandBtn = (
+    <button onClick={() => setExpanded(true)} title="Expand chart" style={{
+      display: "flex", alignItems: "center", gap: 6, font: `700 12px ${FONT}`, padding: "6px 12px",
+      borderRadius: 40, border: "none", cursor: "pointer", background: C.chip, color: "#fff",
+    }}>⤢ Expand</button>
+  );
+  const hint = (
+    <span style={{ font: `400 11px ${FONT}`, color: C.t50 }}>Scroll to zoom · Shift-scroll or drag to pan</span>
+  );
+
   return (
     <>
       <div style={{ height: 1, background: C.line, margin: "8px 20px", flexShrink: 0 }} />
@@ -988,80 +1172,49 @@ function AnalysisChart({ data, isMobile }) {
             <span style={{ font: `700 20px ${FONT}`, color: "#fff" }}>Chart</span>
             <span style={{ font: `700 12px ${FONT}`, letterSpacing: "0.08em", color: C.t50 }}>GENERATED FROM THE DATA</span>
           </div>
-          {/* Detail-tier selector */}
-          <div style={{ display: "flex", gap: 4, background: C.sub, borderRadius: 40, padding: 4 }}>
-            {CHART_TIERS.map((t) => (
-              <button key={t} onClick={() => setTier(t)} style={{
-                font: `700 12px ${FONT}`, padding: "6px 12px", borderRadius: 40, border: "none", cursor: "pointer",
-                background: tier === t ? C.chip : "transparent", color: tier === t ? "#fff" : C.t50,
-              }}>{t}</button>
-            ))}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <TierSelector tier={tier} setTier={setTier} />
+            {expandBtn}
           </div>
         </div>
 
-        <div style={{ width: "100%", aspectRatio: `${W} / ${H}`, background: C.sub, borderRadius: 16, overflow: "hidden" }}>
-          <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} width="100%" height="100%"
-            onMouseMove={onMove} onMouseLeave={() => setHover(null)} style={{ display: "block", cursor: "crosshair" }}>
-            {grid}
+        <ChartCanvas data={data} tier={tier} view={view} setView={setView} W={720} H={isMobile ? 280 : 340} />
 
-            {/* Full: shade the rise (green) and correction (red) segments. */}
-            {showFull && seg.highestHighIdx != null && (
-              <>
-                {seg.priorSeqLowIdx != null && (
-                  <rect x={x(seg.priorSeqLowIdx)} y={padT} width={Math.max(0, x(seg.highestHighIdx) - x(seg.priorSeqLowIdx))}
-                    height={plotH} fill={C.green} opacity={0.07} />
-                )}
-                <rect x={x(seg.highestHighIdx)} y={padT} width={Math.max(0, x(last) - x(seg.highestHighIdx))}
-                  height={plotH} fill={C.red} opacity={0.07} />
-              </>
-            )}
-
-            {/* Candles */}
-            {Array.from({ length: N }, (_, i) => {
-              const o = candles.open[i], c = candles.close[i], h = candles.high[i], l = candles.low[i];
-              const up = c >= o, col = up ? C.green : C.red;
-              const yo = y(o), yc = y(c);
-              const top = Math.min(yo, yc), bh = Math.max(1, Math.abs(yc - yo));
-              return (
-                <g key={i}>
-                  <line x1={x(i)} y1={y(h)} x2={x(i)} y2={y(l)} stroke={col} strokeWidth={1} />
-                  <rect x={x(i) - bodyW / 2} y={top} width={bodyW} height={bh} fill={col} rx={0.5} />
-                </g>
-              );
-            })}
-
-            {/* Full: lower Bollinger band */}
-            {showFull && polyline(series.bollLo, "#9AA0AE", 1, "4 3")}
-
-            {/* Moving averages (all tiers) */}
-            {polyline(series.green13, C.green, 1.8)}
-            {polyline(series.red, C.red, 1.6)}
-
-            {/* Full: swing pivot dots */}
-            {showFull && (piv.ph || []).map((p, j) => (
-              <circle key={`ph${j}`} cx={x(p.i)} cy={y(p.price) - 5} r={2.4} fill={C.green} />
-            ))}
-            {showFull && (piv.pl || []).map((p, j) => (
-              <circle key={`pl${j}`} cx={x(p.i)} cy={y(p.price) + 5} r={2.4} fill={C.red} />
-            ))}
-
-            {/* Core+: trade levels */}
-            {showLevels && level(m.highestHigh, C.green, "Target")}
-            {showLevels && level(m.buy, C.blue, "Buy")}
-            {showLevels && level(m.candleLow, C.red, "Stop")}
-
-            {/* Date axis */}
-            {[0, Math.floor(last / 2), last].map((i, j) => (
-              <text key={j} x={Math.min(Math.max(x(i), padL + 14), padL + plotW - 14)} y={H - 8}
-                textAnchor="middle" fill={C.t40} style={{ font: `400 9px ${FONT}` }}>{dates[i] || ""}</text>
-            ))}
-
-            {tip}
-          </svg>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <ChartLegend tier={tier} />
+          {hint}
         </div>
-
-        <ChartLegend tier={tier} />
       </div>
+
+      {/* Expand overlay */}
+      {expanded && (
+        <div onClick={() => setExpanded(false)} style={{
+          position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.72)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: isMobile ? 12 : 24,
+        }}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            width: "94vw", maxWidth: 1400, maxHeight: "92vh", overflow: "auto", background: C.card,
+            borderRadius: 24, boxShadow: `${INSET}, 0 24px 60px rgba(0,0,0,0.5)`, padding: isMobile ? 14 : 20,
+            display: "flex", flexDirection: "column", gap: 14,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <span style={{ font: `700 20px ${FONT}`, color: "#fff" }}>Chart — {data.name || data.ticker}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <TierSelector tier={tier} setTier={setTier} />
+                <button onClick={() => setExpanded(false)} aria-label="Close" title="Close" style={{
+                  width: 34, height: 34, borderRadius: "50%", border: "none", cursor: "pointer",
+                  background: C.chip, color: "#fff", font: `700 16px ${FONT}`,
+                }}>✕</button>
+              </div>
+            </div>
+            <ChartCanvas data={data} tier={tier} view={view} setView={setView} W={1200} H={620} maxH="74vh" />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <ChartLegend tier={tier} />
+              {hint}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
