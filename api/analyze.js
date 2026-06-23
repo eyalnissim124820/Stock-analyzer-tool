@@ -63,6 +63,7 @@ async function fetchCandles(ticker, timeframe) {
 
   return {
     candles: { open: O, high: H, low: L, close: C, volume: V },
+    dates: T.map((t) => new Date(t * 1000).toISOString().slice(0, 10)),
     lastDate: T.length ? new Date(T[T.length - 1] * 1000).toISOString().slice(0, 10) : null,
     currency: meta.currency || null,
     exchange: meta.fullExchangeName || meta.exchangeName || null,
@@ -102,6 +103,11 @@ module.exports = async (req, res) => {
       conclusion: c,
       pivots: result.pivots,
       segments: result.segments,
+      // Chart data — raw candles + the indicator series the engine already
+      // computed + per-candle dates, so the UI can render the analysis visually.
+      candles: data.candles,
+      series: result.series,
+      dates: data.dates,
     });
   } catch (e) {
     return res.status(502).json({ error: e.message || "Fetch/analysis failed" });
