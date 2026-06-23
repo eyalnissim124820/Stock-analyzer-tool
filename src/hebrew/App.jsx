@@ -208,6 +208,76 @@ function LangLink() {
   );
 }
 
+// תפריט קליק-ימני בסגנון macOS, נפתח במיקום הסמן ומוצמד לגבולות החלון.
+// נסגר בלחיצה מחוץ לו, ב-Escape, בגלילה או בשינוי גודל. לחיצות בתוכו עוצרות
+// את ההתפשטות כדי שמאזין "הסגירה בלחיצה" הגלובלי לא יקדים את ה-onClick.
+function ContextMenu({ x, y, items, onClose }) {
+  const ref = useRef(null);
+  const [pos, setPos] = useState({ left: x, top: y });
+
+  useEffect(() => {
+    const r = ref.current?.getBoundingClientRect();
+    const w = r?.width || 200, h = r?.height || 100, margin = 8;
+    setPos({
+      left: Math.max(margin, Math.min(x, window.innerWidth - w - margin)),
+      top: Math.max(margin, Math.min(y, window.innerHeight - h - margin)),
+    });
+  }, [x, y]);
+
+  useEffect(() => {
+    const close = () => onClose();
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("mousedown", close);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  return (
+    <div ref={ref} dir="rtl"
+      onMouseDown={(e) => e.stopPropagation()}
+      onContextMenu={(e) => e.preventDefault()}
+      style={{
+        position: "fixed", left: pos.left, top: pos.top, zIndex: 1100, minWidth: 180,
+        background: C.card2, borderRadius: 12, padding: 6,
+        boxShadow: `${INSET}, 0 12px 28px rgba(0,0,0,0.45)`,
+        display: "flex", flexDirection: "column", gap: 2,
+      }}>
+      {items.map((it, i) => (
+        <ContextItem key={i} item={it} onClose={onClose} />
+      ))}
+    </div>
+  );
+}
+
+function ContextItem({ item, onClose }) {
+  const [hover, setHover] = useState(false);
+  const disabled = !!item.disabled;
+  const color = disabled ? C.t40 : item.danger ? C.red : "#fff";
+  return (
+    <button
+      disabled={disabled}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      onClick={() => { if (disabled) return; item.onClick(); onClose(); }}
+      style={{
+        display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "right",
+        padding: "9px 12px", borderRadius: 8, border: "none",
+        cursor: disabled ? "not-allowed" : "pointer",
+        background: hover && !disabled ? "rgba(255,255,255,0.08)" : "transparent",
+        color, font: `600 14px ${FONT}`, whiteSpace: "nowrap",
+      }}>
+      {item.icon && <span style={{ font: `400 15px ${FONT}`, lineHeight: 1, width: 16, textAlign: "center" }}>{item.icon}</span>}
+      {item.label}
+    </button>
+  );
+}
+
 // ── רכיב השורש ──────────────────────────────────────────────
 export default function App() {
   const [timeframe, setTimeframe] = useState("Weekly");
@@ -221,6 +291,7 @@ export default function App() {
   const swingTimer = useRef(null);
   const fileRef = useRef(null);
   const [batch, setBatch] = useState(null); // { rows:[{rawSymbol,market,tf}], fileName } בזמן שהחלון פתוח
+  const [menu, setMenu] = useState(null);   // { x, y, stock } — תפריט קליק-ימני פתוח
 
   const isMobile = useWindowWidth() < 920;
 
@@ -291,6 +362,23 @@ export default function App() {
       if (stockId === selectedId) setSelectedId(next.length ? next[0].id : null);
       return next;
     });
+  }
+
+  // ── ייצוא CSV ──
+  // ייצוא סריקה בודדת כקובץ CSV נפרד (קליק-ימני → ייצוא).
+  function exportStock(stock) {
+    if (!stock) return;
+    downloadCsv(`${stock.display || "scan"}_${(stock.data && stock.data.timeframe) || timeframe}_${stamp()}.csv`, buildScansCsv([stock]));
+  }
+  // ייצוא כל הסריקות לקובץ CSV אחד — שורה אחת לכל סריקה, כל השלבים והנתונים, ללא הגרף.
+  function exportAll() {
+    if (!stocks.length) return;
+    downloadCsv(`stock_scans_${stamp()}.csv`, buildScansCsv(stocks));
+  }
+  // פתיחת תפריט הקליק-הימני לשורת סריקה במיקום הסמן.
+  function openMenu(e, stock) {
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY, stock });
   }
 
   // ── ניתוח קבוצתי (העלאת CSV) ──
@@ -388,6 +476,7 @@ export default function App() {
           symbol={symbol} setSymbol={setSymbol} analyze={analyze}
           stocks={stocks} selectedId={selectedId} setSelectedId={selectStock} removeStock={removeStock}
           onBatch={openBatch} onDownloadDemo={downloadDemoFile}
+          onExportAll={exportAll} onContext={openMenu}
         />
       )}
       {(!isMobile || mobileDetail) && (
@@ -402,6 +491,12 @@ export default function App() {
 
       <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onBatchFile} style={{ display: "none" }} />
       {batch && <BatchModal batch={batch} onScanAll={scanAll} onCancel={clearBatch} />}
+      {menu && (
+        <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)} items={[
+          { label: "ייצוא", icon: "⬇", disabled: menu.stock.loading, onClick: () => exportStock(menu.stock) },
+          { label: "הסרה", icon: "×", danger: true, onClick: () => removeStock(menu.stock.id) },
+        ]} />
+      )}
       <LangLink />
     </div>
   );
@@ -441,12 +536,13 @@ function BatchModal({ batch, onScanAll, onCancel }) {
 }
 
 // ── סרגל צד ─────────────────────────────────────────────────
-function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, onSwing, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId, removeStock, onBatch, onDownloadDemo }) {
+function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, onSwing, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId, removeStock, onBatch, onDownloadDemo, onExportAll, onContext }) {
   const [tfHover, setTfHover] = useState(false);
   const [mkHover, setMkHover] = useState(false);
   const [anHover, setAnHover] = useState(false);
   const [batchHover, setBatchHover] = useState(false);
   const [demoHover, setDemoHover] = useState(false);
+  const [exportHover, setExportHover] = useState(false);
   const [focus, setFocus] = useState(false);
 
   const ctlH = isMobile ? 56 : 69;
@@ -551,6 +647,22 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
         </button>
       </div>
 
+      {/* ייצוא כל הסריקות → קובץ CSV אחד, שורה לכל סריקה (ללא הגרף) */}
+      {stocks.length > 0 && (
+        <button
+          onClick={onExportAll}
+          onMouseEnter={() => setExportHover(true)} onMouseLeave={() => setExportHover(false)}
+          title="הורדת כל הסריקות כקובץ CSV אחד (שורה לכל סריקה)"
+          style={{
+            flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+            background: C.card, borderRadius: 24, boxShadow: INSET, padding: "16px 20px",
+            color: exportHover ? "#fff" : C.t70, font: `700 15px ${FONT}`, border: "none", cursor: "pointer",
+            transition: "color .12s",
+          }}>
+          <span style={{ font: `400 16px ${FONT}`, lineHeight: 1 }}>⬇</span> ייצוא כל הסריקות
+        </button>
+      )}
+
       {/* רשימת המניות */}
       <div style={{
         flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column",
@@ -574,7 +686,7 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
             {g.rows.map((s) => (
               <StockRow key={s.id} s={s} timeframe={timeframe} isMobile={isMobile}
                 selected={s.id === selectedId} onClick={() => !s.loading && setSelectedId(s.id)}
-                onRemove={() => removeStock(s.id)} />
+                onRemove={() => removeStock(s.id)} onContext={onContext} />
             ))}
           </React.Fragment>
         ))}
@@ -583,7 +695,7 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
   );
 }
 
-function StockRow({ s, timeframe, isMobile, selected, onClick, onRemove }) {
+function StockRow({ s, timeframe, isMobile, selected, onClick, onRemove, onContext }) {
   const [hover, setHover] = useState(false);
   const [xHover, setXHover] = useState(false);
   // במגע אין hover — שומרים על כפתור ההסרה נגיש (ומסתירים בזמן טעינה כדי שלא
@@ -599,6 +711,7 @@ function StockRow({ s, timeframe, isMobile, selected, onClick, onRemove }) {
   const sub = s.error ? "הניתוח נכשל" : `${MK_LABEL[s.market] || s.market} · ${TF_LABEL[tf] || tf} · ${s.data ? s.data.lastDate : "…"}`;
   return (
     <div onClick={onClick}
+      onContextMenu={(e) => onContext && onContext(e, s)}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => { setHover(false); setXHover(false); }}
       style={{
         position: "relative", display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 20,
@@ -1308,6 +1421,83 @@ function MonCard({ title, color, items }) {
       ))}
     </div>
   );
+}
+
+// ── ייצוא CSV ────────────────────────────────────────────────
+// שיטוח סריקה בודדת לשורה של עמודות: זיהוי + החלטה + חישוב הסיכון/תשואה +
+// כל הבדיקות ("השלבים" של השיטה) עם התשובה הסופית, הוודאות וההסבר. הגרף
+// החזותי (נרות / סדרות / נקודות מפנה) מוחרג בכוונה.
+const EXPORT_CHECK_IDS = ["P1", "P2", "P3", "P4", "P5", "Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "Q9"];
+const VAL_LABEL = { yes: "כן", no: "לא", na: "לא רלוונטי" };
+
+function scanRecord(stock) {
+  const d = stock.data || {};
+  const o = stock.overrides || {};
+  const m = d.math || {};
+  const fv = (id) => (id in o ? o[id] : d.checks?.[id]?.value);  // התשובה הסופית (העדפה ידנית גוברת)
+  const num = (x, dec = 2) => (x == null || isNaN(x) ? "" : Number(x).toFixed(dec));
+  const concl = !stock.loading && !stock.error && d.checks ? verdict(d.checks, o, m) : null;
+
+  const rec = {
+    "סימול": stock.display || "",
+    "טיקר": stock.ticker || "",
+    "שוק": MK_LABEL[stock.market] || stock.market || "",
+    "שם": d.name || stock.name || "",
+    "בורסה": d.exchange || "",
+    "מטבע": d.currency || "",
+    "טווח זמן": TF_LABEL[d.timeframe] || d.timeframe || "",
+    "נר אחרון": d.lastDate || "",
+    "נמשך בתאריך": stock.fetchedAt ? new Date(stock.fetchedAt).toISOString() : "",
+    "רגישות תנודה": d.swingN ?? "",
+    "סטטוס": stock.error ? "שגיאה" : stock.loading ? "טוען" : "נותח",
+    "הודעת שגיאה": stock.error || "",
+    "החלטה": concl ? VLABEL[concl.code] : "",
+    "סיכון %": num(m.risk),
+    "תשואה %": num(m.reward),
+    "יחס": num(m.ratio),
+    "קנייה (סגירה אחרונה)": num(m.buy),
+    "שפל הנר (סטופ)": num(m.candleLow),
+    "שיא גבוה (יעד)": num(m.highestHigh),
+    "מחיר לימיט מקסימלי": num(m.maxBuy),
+    "אות כניסה": (m.triggeredK || []).join(" "),
+  };
+  for (const id of EXPORT_CHECK_IDS) {
+    const ch = d.checks?.[id] || {};
+    rec[`${id} · ${CHECK_TITLES[id]}`] = VAL_LABEL[fv(id)] || "";
+    rec[`${id} ודאות`] = ch.conf ? CONF[ch.conf]?.label || ch.conf : "";
+    rec[`${id} נערך`] = id in o ? "כן" : "";
+    rec[`${id} הסבר`] = ch.why || "";
+  }
+  return rec;
+}
+
+function csvCell(val) {
+  const s = val == null ? "" : String(val);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+// שורה אחת לכל סריקה, כולן חולקות כותרת אחת (איחוד מפתחות לפי סדר ההופעה).
+function buildScansCsv(stocks) {
+  const records = stocks.map(scanRecord);
+  const cols = [];
+  const seen = new Set();
+  for (const r of records) for (const k of Object.keys(r)) if (!seen.has(k)) { seen.add(k); cols.push(k); }
+  const lines = [cols.map(csvCell).join(",")];
+  for (const r of records) lines.push(cols.map((c) => csvCell(r[c])).join(","));
+  return "﻿" + lines.join("\r\n"); // BOM של UTF-8 כדי שאקסל יקרא עברית כראוי
+}
+
+function downloadCsv(filename, csv) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// חותמת זמן בטוחה לשם קובץ (YYYY-MM-DD-HH-MM-SS).
+function stamp() {
+  return new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
 }
 
 // ── פונקציות עזר ─────────────────────────────────────────────
