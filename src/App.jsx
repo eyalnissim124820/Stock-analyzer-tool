@@ -529,6 +529,7 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
   const [demoHover, setDemoHover] = useState(false);
   const [exportHover, setExportHover] = useState(false);
   const [focus, setFocus] = useState(false);
+  const [sortMode, setSortMode] = useState(null);
 
   const ctlH = isMobile ? 56 : 69;
   const ctlBtn = {
@@ -540,7 +541,11 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
   const mobileToggle = isMobile ? { flex: "1 1 0", minWidth: 0 } : null;
   const mobileFull = isMobile ? { flex: "1 1 100%" } : null;
 
-  const groups = groupByDay(stocks);
+  // When a sort is active, collapse the day grouping into one flat, sorted
+  // list; otherwise keep the default newest-first day grouping.
+  const groups = sortMode
+    ? [{ key: "sorted", header: null, rows: sortStocks(stocks, sortMode) }]
+    : groupByDay(stocks);
 
   return (
     <aside style={{
@@ -632,20 +637,23 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
         </button>
       </div>
 
-      {/* Export all scans → one CSV, one row per scan (no chart) */}
+      {/* Sorting + export-all — only while there are scan results to act on */}
       {stocks.length > 0 && (
-        <button
-          onClick={onExportAll}
-          onMouseEnter={() => setExportHover(true)} onMouseLeave={() => setExportHover(false)}
-          title="Download every scan as a single CSV (one row per scan)"
-          style={{
-            flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-            background: C.card, borderRadius: 24, boxShadow: INSET, padding: "16px 20px",
-            color: exportHover ? "#fff" : C.t70, font: `700 15px ${FONT}`, border: "none", cursor: "pointer",
-            transition: "color .12s",
-          }}>
-          <span style={{ font: `400 16px ${FONT}`, lineHeight: 1 }}>⬇</span> Export all scans
-        </button>
+        <div style={{ display: "flex", alignItems: "stretch", gap: 12, flexShrink: 0 }}>
+          <SortMenu sortMode={sortMode} setSortMode={setSortMode} />
+          <button
+            onClick={onExportAll}
+            onMouseEnter={() => setExportHover(true)} onMouseLeave={() => setExportHover(false)}
+            title="Download every scan as a single CSV (one row per scan)"
+            style={{
+              flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+              background: C.card, borderRadius: 24, boxShadow: INSET, padding: "16px 20px",
+              color: exportHover ? "#fff" : C.t70, font: `700 15px ${FONT}`, border: "none", cursor: "pointer",
+              transition: "color .12s",
+            }}>
+            <span style={{ font: `400 16px ${FONT}`, lineHeight: 1 }}>⬇</span> Export all scans
+          </button>
+        </div>
       )}
 
       {/* Stock list */}
@@ -1536,6 +1544,93 @@ function nameGuess(t) {
     AMD: "Advanced Micro Devices", VOO: "Vanguard S&P 500 ETF", QQQ: "Invesco QQQ Trust", SPY: "SPDR S&P 500 ETF Trust",
   };
   return m[t] || t;
+}
+
+// Sort options offered by the sidebar's "Sorting" button.
+const TF_RANK = { Daily: 0, Weekly: 1, Monthly: 2 };
+const SORT_OPTIONS = [
+  { id: "az", label: "A–Z", hint: "by name" },
+  { id: "buy", label: "Buy", hint: "buy at top" },
+  { id: "market", label: "Market", hint: "US at top" },
+  { id: "dm", label: "D–M", hint: "daily → monthly" },
+];
+
+// Sort the scan list for the Sorting menu. A-Z by name; Buy floats buy /
+// limit-buy verdicts to the top; Market puts US above TLV; D-M orders by
+// timeframe Daily → Weekly → Monthly. Sort is stable, so ties keep their
+// existing newest-first order and still-loading rows fall to the bottom.
+function sortStocks(stocks, mode) {
+  const codeOf = (s) => (!s.loading && !s.error && s.data ? verdict(s.data.checks, s.overrides, s.data.math).code : null);
+  const name = (s) => (s.name || s.display || "").toLowerCase();
+  const buyRank = (s) => { const c = codeOf(s); return c === "BUY" || c === "BUY_LIMIT" ? 0 : 1; };
+  const mktRank = (s) => (s.market === "US" ? 0 : 1);
+  const tfRank = (s) => { const tf = s.data && s.data.timeframe; return tf in TF_RANK ? TF_RANK[tf] : 3; };
+  const cmp = {
+    az: (a, b) => name(a).localeCompare(name(b)),
+    buy: (a, b) => buyRank(a) - buyRank(b),
+    market: (a, b) => mktRank(a) - mktRank(b),
+    dm: (a, b) => tfRank(a) - tfRank(b),
+  }[mode];
+  return cmp ? stocks.slice().sort(cmp) : stocks.slice();
+}
+
+// One row in the Sorting dropdown (its own component for the hover highlight).
+function SortOption({ o, on, onPick }) {
+  const [h, setH] = useState(false);
+  return (
+    <button onClick={onPick} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      style={{
+        display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, width: "100%",
+        background: on || h ? "rgba(255,255,255,0.08)" : "transparent", border: "none", cursor: "pointer",
+      }}>
+      <span style={{ font: `700 15px ${FONT}`, color: "#fff", flexShrink: 0 }}>{o.label}</span>
+      <span style={{ font: `400 12px ${FONT}`, color: C.t50, flex: 1, textAlign: "left" }}>{o.hint}</span>
+      {on && <span style={{ font: `700 14px ${FONT}`, color: C.green }}>✓</span>}
+    </button>
+  );
+}
+
+// "Sorting" button + dropdown shown above the scan list. Clicking an active
+// option again clears the sort (back to the default day grouping).
+function SortMenu({ sortMode, setSortMode }) {
+  const [open, setOpen] = useState(false);
+  const [hover, setHover] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  const active = SORT_OPTIONS.find((o) => o.id === sortMode);
+  return (
+    <div ref={ref} style={{ position: "relative", flexShrink: 0 }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+        title="Sort the scan list"
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+          background: C.card, borderRadius: 24, boxShadow: INSET, padding: "16px 20px",
+          color: open || hover ? "#fff" : C.t70, font: `700 15px ${FONT}`, border: "none",
+          cursor: "pointer", transition: "color .12s", whiteSpace: "nowrap",
+        }}>
+        <span style={{ font: `400 16px ${FONT}`, lineHeight: 1 }}>⇅</span> Sorting{active ? ` · ${active.label}` : ""}
+      </button>
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 8px)", left: 0, minWidth: 220, zIndex: 50,
+          background: C.card2, borderRadius: 16, boxShadow: `${INSET}, 0 12px 28px rgba(0,0,0,0.35)`,
+          padding: 8, display: "flex", flexDirection: "column", gap: 4,
+        }}>
+          {SORT_OPTIONS.map((o) => (
+            <SortOption key={o.id} o={o} on={o.id === sortMode}
+              onPick={() => { setSortMode(o.id === sortMode ? null : o.id); setOpen(false); }} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Group analyzed stocks by the calendar day they were fetched. The most
