@@ -1,4 +1,30 @@
-# The 9-Question Method — Auto-Analyzer
+# Stock Analyzer — two methods, one app
+
+A React + Vercel app with a persistent in-app **mode toggle** (bottom-center)
+that switches between two independent analysis tools sharing the same design
+system and the same Yahoo data layer:
+
+1. **9-Question Method** (`/api/analyze`, `src/App.jsx`) — the original tool,
+   left completely untouched. Documented below.
+2. **Strategy & Tactics — the Sequence Method** (`/api/strategy`,
+   `src/strategy/StrategyApp.jsx`) — a second tool implemented strictly from
+   `CHECKLIST_strategy_tactics_{EN,HE}.md`. It runs the Market-first gate →
+   STEP 1 Strategy (S1–S4) → STEP 2 Tactic (multi-timeframe cascade, or a single
+   timeframe + MA5>MA20 gate) → STEP 3 Correction (C1–C3) → STEP 4 Timing
+   (T1–T2), then buy-timing options, position management, and sell signals. Uses
+   ONLY the method's inputs (candles, MA5/MA20/MA40, volume, CCI(5), Bollinger,
+   sequence structure) — no RSI, MACD, Fibonacci, news, earnings, or sentiment.
+
+Both tools exist in English (`index.html`) and Hebrew (`hebrew.html`). The new
+Sequence tool is one locale-parameterized component used by both languages; its
+logic lives in the pure, I/O-free `api/_sequence.js`. Two judgment calls where
+the spec is silent: the Market-first gate reads a leading index (S&P 500 for US,
+TA-125 for TLV) on a quarterly interval; Bollinger reuses this project's existing
+10/1 convention.
+
+---
+
+## The 9-Question Method — Auto-Analyzer
 
 A React + Vercel app that runs the entire 9-Question chart method automatically.
 Enter a ticker; it fetches daily candles, computes every indicator, evaluates all
