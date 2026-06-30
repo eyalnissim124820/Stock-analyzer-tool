@@ -59,6 +59,14 @@ export const T = {
     swingHelp:
       "How many candles on each side of a bar must be lower (peak) or higher (trough) before it counts as a real swing point — on a closing basis. Higher = stricter, fewer/larger swings. Drives S1, S4, the correction/break detection and the target.",
     emptyList: "Analyze a stock to add it to your list",
+    sort: {
+      button: "Sorting",
+      title: "Sort the scan list",
+      az: { label: "A–Z", hint: "by name" },
+      buy: { label: "Buy", hint: "buy at top" },
+      market: { label: "Market", hint: "US at top" },
+      dm: { label: "D–M", hint: "daily → monthly" },
+    },
     selectPrompt: "Select a stock to view the strategy analysis",
     analyzing: (t) => `Analyzing ${t}…`,
     failed: (t, e) => `Couldn't analyze ${t} — ${e}`,
@@ -150,6 +158,14 @@ export const T = {
     swingHelp:
       "כמה נרות בכל צד של נר חייבים להיות נמוכים יותר (פסגה) או גבוהים יותר (שפל) כדי שייחשב נקודת מפנה — על בסיס סגירה. גבוה יותר = מחמיר יותר, פחות תנודות וגדולות יותר. משפיע על S1, S4, זיהוי התיקון/השבירה והיעד.",
     emptyList: "נתחו מנייה כדי להוסיף אותה לרשימה",
+    sort: {
+      button: "מיון",
+      title: "מיון רשימת הסריקות",
+      az: { label: "א–ת", hint: "לפי שם" },
+      buy: { label: "קנייה", hint: "קנייה למעלה" },
+      market: { label: "שוק", hint: "ארה״ב למעלה" },
+      dm: { label: "יומי–חודשי", hint: "יומי → חודשי" },
+    },
     selectPrompt: "בחרו מנייה כדי לראות את ניתוח האסטרטגיה",
     analyzing: (t) => `מנתח את ${t}…`,
     failed: (t, e) => `לא ניתן לנתח את ${t} — ${e}`,

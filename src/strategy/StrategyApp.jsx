@@ -51,6 +51,87 @@ function verdict(data, overrides) {
 }
 const isGood = (code) => code === "BUY" || code === "BUY_LIMIT";
 
+// Sort options offered by the sidebar's "Sorting" button (labels come from the
+// locale strings). A-Z by name; Buy floats buy / limit-buy verdicts to the top;
+// Market puts US above TLV; D-M orders by timeframe Daily → Weekly → Monthly.
+// Sort is stable, so ties keep their order and loading rows fall to the bottom.
+const TF_RANK = { Daily: 0, Weekly: 1, Monthly: 2 };
+const SORT_IDS = ["az", "buy", "market", "dm"];
+function sortStocks(stocks, mode) {
+  const codeOf = (s) => (!s.loading && !s.error && s.data ? verdict(s.data, s.overrides).code : null);
+  const name = (s) => (s.name || s.display || "").toLowerCase();
+  const buyRank = (s) => (isGood(codeOf(s)) ? 0 : 1);
+  const mktRank = (s) => (s.market === "US" ? 0 : 1);
+  const tfRank = (s) => { const tf = s.data && s.data.timeframe; return tf in TF_RANK ? TF_RANK[tf] : 3; };
+  const cmp = {
+    az: (a, b) => name(a).localeCompare(name(b)),
+    buy: (a, b) => buyRank(a) - buyRank(b),
+    market: (a, b) => mktRank(a) - mktRank(b),
+    dm: (a, b) => tfRank(a) - tfRank(b),
+  }[mode];
+  return cmp ? stocks.slice().sort(cmp) : stocks.slice();
+}
+
+// One row in the Sorting dropdown (its own component for the hover highlight).
+function SortOption({ o, on, onPick, font, dir }) {
+  const [h, setH] = useState(false);
+  return (
+    <button onClick={onPick} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      style={{
+        display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, width: "100%",
+        background: on || h ? "rgba(255,255,255,0.08)" : "transparent", border: "none", cursor: "pointer",
+      }}>
+      <span style={{ font: `700 15px ${font}`, color: "#fff", flexShrink: 0 }}>{o.label}</span>
+      <span style={{ font: `400 12px ${font}`, color: C.t50, flex: 1, textAlign: dir === "rtl" ? "right" : "left" }}>{o.hint}</span>
+      {on && <span style={{ font: `700 14px ${font}`, color: C.green }}>✓</span>}
+    </button>
+  );
+}
+
+// "Sorting" button + dropdown shown above the scan list. Clicking an active
+// option again clears the sort (back to the default newest-first order).
+function SortMenu({ sortMode, setSortMode, t, font, dir }) {
+  const [open, setOpen] = useState(false);
+  const [hover, setHover] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  const opts = SORT_IDS.map((id) => ({ id, ...t.sort[id] }));
+  const active = opts.find((o) => o.id === sortMode);
+  return (
+    <div ref={ref} style={{ position: "relative", flexShrink: 0 }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+        title={t.sort.title}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+          background: C.card, borderRadius: 24, boxShadow: INSET, padding: "16px 20px",
+          color: open || hover ? "#fff" : C.t70, font: `700 15px ${font}`, border: "none",
+          cursor: "pointer", transition: "color .12s", whiteSpace: "nowrap",
+        }}>
+        <span style={{ font: `400 16px ${font}`, lineHeight: 1 }}>⇅</span> {t.sort.button}{active ? ` · ${active.label}` : ""}
+      </button>
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 8px)", insetInlineStart: 0, minWidth: 220, zIndex: 50,
+          background: C.card2, borderRadius: 16, boxShadow: `${INSET}, 0 12px 28px rgba(0,0,0,0.35)`,
+          padding: 8, display: "flex", flexDirection: "column", gap: 4,
+        }}>
+          {opts.map((o) => (
+            <SortOption key={o.id} o={o} on={o.id === sortMode} font={font} dir={dir}
+              onPick={() => { setSortMode(o.id === sortMode ? null : o.id); setOpen(false); }} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function useWindowWidth() {
   const [w, setW] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 1440));
   useEffect(() => {
@@ -364,6 +445,7 @@ function Sidebar({ t, font, dir, isMobile, market, setMarket, technique, onTechn
   const [focus, setFocus] = useState(false);
   const [batchHover, setBatchHover] = useState(false);
   const [demoHover, setDemoHover] = useState(false);
+  const [sortMode, setSortMode] = useState(null);
   const ctlH = isMobile ? 56 : 69;
   const ctlBtn = { display: "flex", alignItems: "center", justifyContent: "center", height: ctlH, padding: isMobile ? "0 14px" : "0 20px", borderRadius: 16, color: "#fff", font: `700 15px ${font}`, border: "none", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0, transition: "background .12s", background: "rgba(0,0,0,0.18)" };
   const mobileToggle = isMobile ? { flex: "1 1 0", minWidth: 0 } : null;
@@ -406,6 +488,13 @@ function Sidebar({ t, font, dir, isMobile, market, setMarket, technique, onTechn
         </button>
       </div>
 
+      {/* Sorting — only while there are scan results to act on */}
+      {stocks.length > 0 && (
+        <div style={{ display: "flex", flexShrink: 0 }}>
+          <SortMenu sortMode={sortMode} setSortMode={setSortMode} t={t} font={font} dir={dir} />
+        </div>
+      )}
+
       {/* Stock list */}
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, padding: "4px 16px 24px" }}>
         {stocks.length === 0 && (
@@ -413,7 +502,7 @@ function Sidebar({ t, font, dir, isMobile, market, setMarket, technique, onTechn
             <span style={{ font: `700 16px ${font}`, color: C.t50 }}>{t.emptyList}</span>
           </div>
         )}
-        {stocks.map((s) => (
+        {(sortMode ? sortStocks(stocks, sortMode) : stocks).map((s) => (
           <StockRow key={s.id} {...{ s, t, font, dir, isMobile, selected: s.id === selectedId, onClick: () => !s.loading && setSelectedId(s.id), onRemove: () => removeStock(s.id), onContext }} />
         ))}
       </div>
