@@ -66,6 +66,16 @@ export const T = {
     fetched: "Fetched",
     refresh: "Refresh",
     backToList: "‹ Stock list",
+    batch: {
+      button: "Batch analysis",
+      buttonTitle: "Upload a CSV to scan many stocks at once",
+      demo: "Demo file",
+      demoTitle: "Download an example CSV file",
+      title: "Batch analysis scan",
+      foundParts: (n) => ({ mid: ` stock${n === 1 ? "" : "s"} ${n === 1 ? "was" : "were"} found in `, post: ". Uploading it will initiate the scan of all of them." }),
+      cancel: "Cancel",
+      scanAll: "Scan all",
+    },
     groups: {
       market: { title: "Market", caption: "ASSESS FIRST" },
       strategy: { title: "Strategy — should we buy?", caption: "STEP 1 · ALL MUST PASS" },
@@ -147,6 +157,16 @@ export const T = {
     fetched: "נמשך",
     refresh: "רענון",
     backToList: "‹ רשימת מניות",
+    batch: {
+      button: "ניתוח מרובה",
+      buttonTitle: "העלו קובץ CSV לסריקת מספר מניות בבת אחת",
+      demo: "קובץ דמו",
+      demoTitle: "הורידו קובץ CSV לדוגמה",
+      title: "סריקת ניתוח מרובה",
+      foundParts: (n) => ({ mid: ` מניות נמצאו בקובץ `, post: ". העלאתו תתחיל בסריקה של כולן." }),
+      cancel: "ביטול",
+      scanAll: "סרוק הכול",
+    },
     groups: {
       market: { title: "שוק", caption: "בדיקה ראשונה" },
       strategy: { title: "אסטרטגיה — האם לקנות?", caption: "שלב 1 · הכול חייב לעבור" },
