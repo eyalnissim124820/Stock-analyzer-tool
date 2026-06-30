@@ -609,7 +609,7 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
         <span style={{ font: `700 16px ${FONT}`, color: "#fff", minWidth: 16, textAlign: "center" }}>{swingN}</span>
       </div>
 
-      {/* Batch analysis */}
+      {/* Batch analysis + demo + sorting (shown once there are results) */}
       <div style={{ display: "flex", gap: 12, flexShrink: 0 }}>
         <button
           onClick={onBatch}
@@ -635,12 +635,12 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
           }}>
           <span style={{ font: `400 16px ${FONT}`, lineHeight: 1 }}>⬇</span> Demo file
         </button>
+        {stocks.length > 0 && <SortMenu sortMode={sortMode} setSortMode={setSortMode} />}
       </div>
 
-      {/* Sorting + export-all — only while there are scan results to act on */}
+      {/* Export all scans → one CSV, one row per scan (no chart) */}
       {stocks.length > 0 && (
-        <div style={{ display: "flex", alignItems: "stretch", gap: 12, flexShrink: 0 }}>
-          <SortMenu sortMode={sortMode} setSortMode={setSortMode} />
+        <div style={{ display: "flex", flexShrink: 0 }}>
           <button
             onClick={onExportAll}
             onMouseEnter={() => setExportHover(true)} onMouseLeave={() => setExportHover(false)}

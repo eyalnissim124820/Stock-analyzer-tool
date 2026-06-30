@@ -476,7 +476,7 @@ function Sidebar({ t, font, dir, isMobile, market, setMarket, technique, onTechn
         <span style={{ font: `700 16px ${font}`, color: "#fff", minWidth: 16, textAlign: "center" }}>{swingN}</span>
       </div>
 
-      {/* Batch analysis */}
+      {/* Batch analysis + demo + sorting (shown once there are results) */}
       <div style={{ display: "flex", gap: 12, flexShrink: 0 }}>
         <button onClick={onBatch} onMouseEnter={() => setBatchHover(true)} onMouseLeave={() => setBatchHover(false)} title={t.batch.buttonTitle}
           style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: C.card, borderRadius: 24, boxShadow: INSET, padding: "16px 20px", color: batchHover ? "#fff" : C.t70, font: `700 15px ${font}`, border: "none", cursor: "pointer", transition: "color .12s" }}>
@@ -486,14 +486,8 @@ function Sidebar({ t, font, dir, isMobile, market, setMarket, technique, onTechn
           style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.card, borderRadius: 24, boxShadow: INSET, padding: "16px 18px", color: demoHover ? "#fff" : C.t50, font: `700 13px ${font}`, border: "none", cursor: "pointer", transition: "color .12s", whiteSpace: "nowrap" }}>
           <span style={{ font: `400 16px ${font}`, lineHeight: 1 }}>⬇</span> {t.batch.demo}
         </button>
+        {stocks.length > 0 && <SortMenu sortMode={sortMode} setSortMode={setSortMode} t={t} font={font} dir={dir} />}
       </div>
-
-      {/* Sorting — only while there are scan results to act on */}
-      {stocks.length > 0 && (
-        <div style={{ display: "flex", flexShrink: 0 }}>
-          <SortMenu sortMode={sortMode} setSortMode={setSortMode} t={t} font={font} dir={dir} />
-        </div>
-      )}
 
       {/* Stock list */}
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, padding: "4px 16px 24px" }}>
