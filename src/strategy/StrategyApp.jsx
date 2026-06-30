@@ -65,6 +65,56 @@ function useWindowWidth() {
 const cleanSymbol = (raw) => (raw || "").trim().toUpperCase().replace(/\.TA$/, "");
 const resolveTicker = (raw, market) => (market === "TLV" ? `${cleanSymbol(raw)}.TA` : cleanSymbol(raw));
 
+// Parse a batch CSV with columns Ticker, Market (US/TLV), Technique (1/2),
+// Timeframe (D/W/M — used only by Technique 2). Tolerant of column order, an
+// optional header, quotes and blank lines (mirrors the 9-Question batch parser).
+function parseBatchCsv(text) {
+  const split = (line) => line.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+  const lines = String(text || "").replace(/^﻿/, "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return [];
+  const head = split(lines[0]).map((h) => h.toLowerCase());
+  const hasHeader = head.some((h) => h.startsWith("ticker"));
+  const find = (p, fallback) => { const i = head.findIndex((h) => h.startsWith(p)); return i >= 0 ? i : fallback; };
+  const ix = hasHeader
+    ? { ticker: find("ticker", 0), market: find("market", 1), tech: find("techn", 2), tf: find("time", 3) >= 0 ? find("time", 3) : find("resol", 3) }
+    : { ticker: 0, market: 1, tech: 2, tf: 3 };
+  const rows = [];
+  for (let i = hasHeader ? 1 : 0; i < lines.length; i++) {
+    const cols = split(lines[i]);
+    const rawSymbol = cleanSymbol(cols[ix.ticker] || "");
+    if (!rawSymbol) continue;
+    const mk = (cols[ix.market] || "US").toUpperCase();
+    const market = mk === "TLV" || mk === "TA" || mk === "TASE" ? "TLV" : "US";
+    const techRaw = (cols[ix.tech] || "1").toUpperCase();
+    const technique = (techRaw.startsWith("2") || techRaw.startsWith("S")) ? 2 : 1; // 2 / "Single"
+    const tfRaw = (cols[ix.tf] || "W").toUpperCase();
+    const tf = tfRaw.startsWith("D") ? "Daily" : tfRaw.startsWith("M") ? "Monthly" : "Weekly";
+    rows.push({ rawSymbol, market, technique, tf });
+  }
+  return rows;
+}
+
+function BatchModal({ batch, t, font, dir, onScanAll, onCancel }) {
+  const count = batch.rows.length;
+  const parts = t.batch.foundParts(count);
+  const btn = { display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 22px", borderRadius: 16, font: `700 15px ${font}`, border: "none", cursor: "pointer", whiteSpace: "nowrap" };
+  const b = (txt) => <strong style={{ color: "#fff", fontWeight: 700 }}>{txt}</strong>;
+  return (
+    <div onClick={onCancel} style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.6)", padding: 20 }}>
+      <div dir={dir} onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 440, background: C.card, borderRadius: 24, boxShadow: `${INSET}, 0 24px 60px rgba(0,0,0,0.5)`, padding: 28, display: "flex", flexDirection: "column", gap: 16 }}>
+        <span style={{ font: `700 20px ${font}`, color: "#fff" }}>{t.batch.title}</span>
+        <span style={{ font: `400 14px ${font}`, color: C.t70, lineHeight: 1.6 }}>
+          {b(count)}{parts.mid}{b(batch.fileName)}{parts.post}
+        </span>
+        <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 4, flexWrap: "wrap" }}>
+          <button onClick={onCancel} style={{ ...btn, background: C.chip, color: "#fff" }}>{t.batch.cancel}</button>
+          <button onClick={onScanAll} disabled={count === 0} style={{ ...btn, background: count === 0 ? "rgba(255,255,255,0.4)" : "#fff", color: C.card, cursor: count === 0 ? "not-allowed" : "pointer" }}>{t.batch.scanAll}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── UI atoms ──
 function Badge({ conf, font, t }) {
   const color = CONF_COLOR[conf];
@@ -181,8 +231,10 @@ export default function StrategyApp({ lang = "en" }) {
   const [selectedId, setSelectedId] = useState(null);
   const [mobileDetail, setMobileDetail] = useState(false);
   const [menu, setMenu] = useState(null);
+  const [batch, setBatch] = useState(null); // { rows, fileName } while the confirm popup is open
   const nextId = useRef(1);
   const swingTimer = useRef(null);
+  const fileRef = useRef(null);
 
   async function fetchStock({ rawSymbol, market: mkt, tech, tf, n, existingId }) {
     const display = cleanSymbol(rawSymbol);
@@ -237,14 +289,67 @@ export default function StrategyApp({ lang = "en" }) {
     setStocks((prev) => { const next = prev.filter((s) => s.id !== stockId); if (stockId === selectedId) setSelectedId(next.length ? next[0].id : null); return next; });
   }
 
+  // ── batch analysis (CSV upload) ──
+  function openBatch() { if (fileRef.current) fileRef.current.click(); }
+  function onBatchFile(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setBatch({ rows: parseBatchCsv(String(reader.result || "")), fileName: file.name });
+    reader.readAsText(file);
+    e.target.value = ""; // reset so re-selecting the same file fires onChange again
+  }
+  function clearBatch() { setBatch(null); if (fileRef.current) fileRef.current.value = ""; }
+  function downloadDemoFile() {
+    const csv = "Ticker,Market,Technique,Timeframe\nAAPL,US,1,W\nNVDA,US,2,W\nTEVA,TLV,1,M\n0745,TLV,2,D\n";
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv" }));
+    a.download = "batch_strategy_example.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  function scanAll() {
+    if (!batch) return;
+    const ids = batch.rows.map((r) => {
+      const id = `s${nextId.current++}`;
+      return { id, display: cleanSymbol(r.rawSymbol), ticker: resolveTicker(r.rawSymbol, r.market), market: r.market, row: r };
+    });
+    setStocks((prev) => [
+      ...ids.map((x) => ({ id: x.id, display: x.display, market: x.market, name: x.display, ticker: x.ticker, loading: true, error: null, data: null, overrides: {}, fetchedAt: new Date() })),
+      ...prev,
+    ]);
+    clearBatch();
+    processBatchQueue(ids, 0);
+  }
+  // Fetch in waves of 5, then recurse to the next wave.
+  async function processBatchQueue(ids, startIdx) {
+    if (startIdx >= ids.length) return;
+    const wave = ids.slice(startIdx, startIdx + 5);
+    const results = await Promise.all(wave.map((x) => {
+      const r = x.row;
+      const url = `/api/strategy?ticker=${encodeURIComponent(x.ticker)}&market=${encodeURIComponent(x.market)}&technique=${r.technique}&timeframe=${encodeURIComponent(r.tf)}&swingN=${swingN}&lang=${lang}`;
+      return fetch(url).then((res) => res.json())
+        .then((j) => (!j.error ? { id: x.id, data: j } : { id: x.id, error: j.error || "Failed" }))
+        .catch((e) => ({ id: x.id, error: e.message }));
+    }));
+    setStocks((prev) => prev.map((s) => {
+      const res = results.find((r) => r.id === s.id);
+      if (!res) return s;
+      return { ...s, loading: false, error: res.error || null, data: res.data || null, name: res.data?.name || s.name, fetchedAt: new Date() };
+    }));
+    processBatchQueue(ids, startIdx + 5);
+  }
+
   return (
     <div dir={dir} style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: isMobile ? "100dvh" : "100vh", width: "100%", background: C.bg, fontFamily: font, color: C.text, overflow: "hidden", ...(isMobile ? { paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" } : null) }}>
       {(!isMobile || !mobileDetail) && (
-        <Sidebar {...{ t, font, dir, isMobile, market, setMarket, technique, onTechnique, timeframe, onTimeframe, symbol, setSymbol, analyze, swingN, onSwing, stocks, selectedId, setSelectedId: selectStock, removeStock, onContext: (e, s) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY, stock: s }); } }} />
+        <Sidebar {...{ t, font, dir, isMobile, market, setMarket, technique, onTechnique, timeframe, onTimeframe, symbol, setSymbol, analyze, swingN, onSwing, stocks, selectedId, setSelectedId: selectStock, removeStock, onBatch: openBatch, onDownloadDemo: downloadDemoFile, onContext: (e, s) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY, stock: s }); } }} />
       )}
       {(!isMobile || mobileDetail) && (
         <Main {...{ t, font, dir, isMobile, onBack: () => setMobileDetail(false), stock: selected, setOverride, refresh: () => selected && reRun({}) }} />
       )}
+      <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onBatchFile} style={{ display: "none" }} />
+      {batch && <BatchModal batch={batch} t={t} font={font} dir={dir} onScanAll={scanAll} onCancel={clearBatch} />}
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} font={font} onClose={() => setMenu(null)} items={[
           { label: lang === "he" ? "הסרה" : "Remove", icon: "×", danger: true, onClick: () => removeStock(menu.stock.id) },
@@ -255,8 +360,10 @@ export default function StrategyApp({ lang = "en" }) {
 }
 
 // ── Sidebar ──
-function Sidebar({ t, font, dir, isMobile, market, setMarket, technique, onTechnique, timeframe, onTimeframe, symbol, setSymbol, analyze, swingN, onSwing, stocks, selectedId, setSelectedId, removeStock, onContext }) {
+function Sidebar({ t, font, dir, isMobile, market, setMarket, technique, onTechnique, timeframe, onTimeframe, symbol, setSymbol, analyze, swingN, onSwing, stocks, selectedId, setSelectedId, removeStock, onBatch, onDownloadDemo, onContext }) {
   const [focus, setFocus] = useState(false);
+  const [batchHover, setBatchHover] = useState(false);
+  const [demoHover, setDemoHover] = useState(false);
   const ctlH = isMobile ? 56 : 69;
   const ctlBtn = { display: "flex", alignItems: "center", justifyContent: "center", height: ctlH, padding: isMobile ? "0 14px" : "0 20px", borderRadius: 16, color: "#fff", font: `700 15px ${font}`, border: "none", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0, transition: "background .12s", background: "rgba(0,0,0,0.18)" };
   const mobileToggle = isMobile ? { flex: "1 1 0", minWidth: 0 } : null;
@@ -285,6 +392,18 @@ function Sidebar({ t, font, dir, isMobile, market, setMarket, technique, onTechn
         </span>
         <input type="range" min={1} max={5} value={swingN} onChange={(e) => onSwing(+e.target.value)} style={{ flex: 1, minWidth: 0, accentColor: C.green }} />
         <span style={{ font: `700 16px ${font}`, color: "#fff", minWidth: 16, textAlign: "center" }}>{swingN}</span>
+      </div>
+
+      {/* Batch analysis */}
+      <div style={{ display: "flex", gap: 12, flexShrink: 0 }}>
+        <button onClick={onBatch} onMouseEnter={() => setBatchHover(true)} onMouseLeave={() => setBatchHover(false)} title={t.batch.buttonTitle}
+          style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: C.card, borderRadius: 24, boxShadow: INSET, padding: "16px 20px", color: batchHover ? "#fff" : C.t70, font: `700 15px ${font}`, border: "none", cursor: "pointer", transition: "color .12s" }}>
+          <span style={{ font: `700 18px ${font}`, lineHeight: 1 }}>⬆</span> {t.batch.button}
+        </button>
+        <button onClick={onDownloadDemo} onMouseEnter={() => setDemoHover(true)} onMouseLeave={() => setDemoHover(false)} title={t.batch.demoTitle}
+          style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.card, borderRadius: 24, boxShadow: INSET, padding: "16px 18px", color: demoHover ? "#fff" : C.t50, font: `700 13px ${font}`, border: "none", cursor: "pointer", transition: "color .12s", whiteSpace: "nowrap" }}>
+          <span style={{ font: `400 16px ${font}`, lineHeight: 1 }}>⬇</span> {t.batch.demo}
+        </button>
       </div>
 
       {/* Stock list */}
