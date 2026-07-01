@@ -12,6 +12,7 @@
 
 const { analyze, conclude, assessMarket } = require("./_sequence.js");
 const { normalizeTicker, fetchCandles, fetchRaw } = require("./_yahoo.js");
+const { resolveTase } = require("./_tase.js");
 
 // Leading index per market for the market-first gate.
 const MARKET_INDEX = { US: "^GSPC", TLV: "^TA125.TA" };
@@ -27,7 +28,11 @@ module.exports = async (req, res) => {
     const timeframe = ["Daily", "Weekly", "Monthly"].includes(q.timeframe) ? q.timeframe : "Weekly";
     const swingN = Math.max(1, Math.min(5, parseInt(q.swingN) || 2));
     const lang = q.lang === "he" ? "he" : "en";
-    const symbol = normalizeTicker(q.ticker, market);
+    // Israeli addition: TASE security numbers / Hebrew or free-text names
+    // resolve to the ".TA" Yahoo symbol; returns null for every input the
+    // original normalizeTicker flow already handles (incl. all US inputs).
+    const il = await resolveTase(q.ticker, market);
+    const symbol = il ? il.symbol : normalizeTicker(q.ticker, market);
 
     // ── candles ──
     const candlesByTf = {};

@@ -382,7 +382,7 @@ export default function StrategyApp({ lang = "en" }) {
   }
   function clearBatch() { setBatch(null); if (fileRef.current) fileRef.current.value = ""; }
   function downloadDemoFile() {
-    const csv = "Ticker,Market,Technique,Timeframe\nAAPL,US,1,W\nNVDA,US,2,W\nTEVA,TLV,1,M\n0745,TLV,2,D\n";
+    const csv = "Ticker,Market,Technique,Timeframe\nAAPL,US,1,W\nNVDA,US,2,W\nTEVA,TLV,1,M\n629014,TLV,2,D\n";
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv" }));
     a.download = "batch_strategy_example.csv";
@@ -460,7 +460,7 @@ function Sidebar({ t, font, dir, isMobile, market, setMarket, technique, onTechn
         {technique === 2 && (
           <button onClick={() => onTimeframe(timeframe === "Daily" ? "Weekly" : timeframe === "Weekly" ? "Monthly" : "Daily")} style={{ ...ctlBtn, ...mobileToggle }} title={t.timeframe}>{timeframe}</button>
         )}
-        <input value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === "Enter" && analyze()} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} placeholder={t.symbolPlaceholder} maxLength={8}
+        <input value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} onKeyDown={(e) => e.key === "Enter" && analyze()} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} placeholder={market === "TLV" ? t.symbolPlaceholderTLV : t.symbolPlaceholder} maxLength={24}
           className={dir === "rtl" ? "ltr" : undefined}
           style={{ flex: 1, minWidth: isMobile ? 0 : 110, height: ctlH, padding: "0 20px", borderRadius: 16, background: focus ? "rgba(0,0,0,0.30)" : "rgba(0,0,0,0.18)", color: "#fff", font: `700 18px ${font}`, border: "none", outline: "none", textAlign: "center", letterSpacing: "0.04em", boxShadow: focus ? "inset 0 0 0 2px #fff" : "none", ...mobileFull }} />
         <button onClick={analyze} style={{ ...ctlBtn, ...mobileFull, background: "#fff", color: C.card }}>{t.analyze}</button>
