@@ -24,6 +24,36 @@ TA-125 for TLV) on a quarterly interval; Bollinger reuses this project's existin
 
 ---
 
+## Israeli market (TASE) lookup — numbers & names
+
+Both tools accept three input shapes for Tel Aviv papers (with the market
+toggle on TLV; Hebrew input works from any toggle state):
+
+| Input | Example | Resolved to |
+|---|---|---|
+| TASE symbol (original flow) | `TEVA` / `TEVA.TA` | `TEVA.TA` |
+| TASE security number (מספר נייר) | `629014` | `TEVA.TA` |
+| Name — Hebrew or English | `טבע`, `בנק הפועלים`, `BANK LEUMI` | `TEVA.TA`, `POLI.TA`, `LUMI.TA` |
+
+This is a pure **addition**: `api/_tase.js` only *resolves* the input into the
+`.TA` symbol; candles still come from the same Yahoo layer. Plain Latin
+symbols and all US inputs bypass the resolver entirely (it returns `null`
+before any network call), so the original behavior is untouched. Resolution
+chain, all free / no keys: a curated static map of large TASE securities
+(instant, offline) → the TASE website's own public JSON (for unknown numbers)
+→ Yahoo's public search endpoint filtered to `.TA` listings (for unknown
+names, with a Hebrew locale attempt for Hebrew queries). Batch CSVs may use
+numbers/names in the Ticker column with `TLV` in the Market column.
+
+Offline test suite (network mocked, works in restricted sandboxes):
+
+```bash
+node tests/regression.js check   # US + symbol-based TLV outputs byte-identical
+node tests/tase.test.js          # Israeli number/name scenarios end-to-end
+```
+
+---
+
 ## The 9-Question Method — Auto-Analyzer
 
 A React + Vercel app that runs the entire 9-Question chart method automatically.

@@ -54,6 +54,7 @@ export const T = {
       "Choose ONE tactic. Technique 1 walks monthly → weekly → daily and the level where a falling sequence appears sets the trade horizon (very few mistakes, more effort). Technique 2 trades a single timeframe you pick and adds the MA5 > MA20 entry gate to compensate for dropping multi-timeframe confirmation.",
     timeframe: "Timeframe",
     symbolPlaceholder: "SYMB",
+    symbolPlaceholderTLV: "TEVA · 629014 · טבע",
     analyze: "Analyze",
     swing: "Swing sensitivity",
     swingHelp:
@@ -153,6 +154,7 @@ export const T = {
       "בוחרים טקטיקה אחת. טכניקה 1 יורדת חודשי → שבועי → יומי, והמימד שבו מופיע רצף יורד קובע את טווח העסקה (מעט טעויות, יותר מאמץ). טכניקה 2 סוחרת מימד זמן אחד שבחרתם ומוסיפה את שער הכניסה MA5 > MA20 כפיצוי על הוויתור על אישור רב-מימדי.",
     timeframe: "מימד זמן",
     symbolPlaceholder: "סמל",
+    symbolPlaceholderTLV: "סמל · מס' נייר · שם",
     analyze: "נתח",
     swing: "רגישות תנודה",
     swingHelp:

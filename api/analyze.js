@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────
 
 const { analyze, conclude } = require("./_engine.js");
+const { resolveTase } = require("./_tase.js");
 
 // Map the UI timeframe to Yahoo's interval + a range that yields
 // ~60–120 candles (the engine needs ~30+ to fill every check).
@@ -78,7 +79,11 @@ module.exports = async (req, res) => {
     if (!ticker) return res.status(400).json({ error: "Missing ?ticker=" });
 
     const tf = TIMEFRAMES[timeframe] ? timeframe : "Daily";
-    const symbol = normalizeTicker(ticker, market);
+    // Israeli addition: TASE security numbers / Hebrew or free-text names
+    // resolve to the ".TA" Yahoo symbol; returns null for every input the
+    // original normalizeTicker flow already handles (incl. all US inputs).
+    const il = await resolveTase(ticker, market === "TLV" ? "TLV" : "US");
+    const symbol = il ? il.symbol : normalizeTicker(ticker, market);
     const data = await fetchCandles(symbol, tf);
     const n = Math.max(1, Math.min(5, parseInt(swingN) || 2));
     const result = analyze(data.candles, {

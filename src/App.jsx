@@ -380,7 +380,7 @@ export default function App() {
   }
   function clearBatch() { setBatch(null); if (fileRef.current) fileRef.current.value = ""; }
   function downloadDemoFile() {
-    const csv = "Ticker,Market,Resolutions\nAAPL,US,W\nNVDA,US,M\nTEVA,TLV,W\n0745,TLV,M\n";
+    const csv = "Ticker,Market,Resolutions\nAAPL,US,W\nNVDA,US,M\nTEVA,TLV,W\n629014,TLV,M\n";
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
     a.download = "batch_analysis_example.csv";
@@ -578,7 +578,7 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
           onChange={(e) => setSymbol(e.target.value.toUpperCase())}
           onKeyDown={(e) => e.key === "Enter" && analyze()}
           onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
-          placeholder="SYMB" maxLength={8}
+          placeholder={market === "TLV" ? "TEVA · 629014 · טבע" : "SYMB"} maxLength={24}
           style={{
             flex: 1, minWidth: isMobile ? 0 : 120, height: ctlH, padding: "0 24px", borderRadius: 16,
             background: focus ? "rgba(0,0,0,0.30)" : "rgba(0,0,0,0.18)", color: "#fff",
