@@ -1649,7 +1649,221 @@
     "2026-06-12",
     "2026-06-19",
     "2026-06-26"
-   ]
+   ],
+   "peaks": {
+    "params": {
+     "mode": "lookback",
+     "reversalPct": null,
+     "atrMult": null,
+     "lookback": 2
+    },
+    "points": [
+     {
+      "i": 5,
+      "price": 167.85,
+      "kind": "L",
+      "label": "L"
+     },
+     {
+      "i": 25,
+      "price": 192.49,
+      "kind": "H",
+      "label": "H"
+     },
+     {
+      "i": 27,
+      "price": 189.85,
+      "kind": "L",
+      "label": "HL"
+     },
+     {
+      "i": 30,
+      "price": 193.35,
+      "kind": "H",
+      "label": "HH"
+     },
+     {
+      "i": 31,
+      "price": 189.89,
+      "kind": "L",
+      "label": "HL"
+     },
+     {
+      "i": 37,
+      "price": 192.75,
+      "kind": "H",
+      "label": "LH"
+     },
+     {
+      "i": 43,
+      "price": 183.91,
+      "kind": "L",
+      "label": "LL"
+     },
+     {
+      "i": 48,
+      "price": 185.33,
+      "kind": "H",
+      "label": "LH"
+     },
+     {
+      "i": 54,
+      "price": 177.74,
+      "kind": "L",
+      "label": "LL"
+     },
+     {
+      "i": 57,
+      "price": 181.04,
+      "kind": "H",
+      "label": "LH"
+     },
+     {
+      "i": 62,
+      "price": 179.62,
+      "kind": "L",
+      "label": "HL"
+     },
+     {
+      "i": 85,
+      "price": 197.78,
+      "kind": "H",
+      "label": "HH"
+     },
+     {
+      "i": 88,
+      "price": 194.17,
+      "kind": "L",
+      "label": "HL"
+     },
+     {
+      "i": 91,
+      "price": 197.05,
+      "kind": "H",
+      "label": "LH"
+     },
+     {
+      "i": 106,
+      "price": 184.61,
+      "kind": "L",
+      "label": "LL"
+     },
+     {
+      "i": 108,
+      "price": 187.68,
+      "kind": "H",
+      "label": "LH"
+     },
+     {
+      "i": 110,
+      "price": 185.01,
+      "kind": "L",
+      "label": "HL"
+     },
+     {
+      "i": 139,
+      "price": 203.08,
+      "kind": "H",
+      "provisional": true,
+      "label": "HH"
+     }
+    ],
+    "trend": {
+     "trend": "range",
+     "confidence": 0.5,
+     "reasons": [
+      "Last 4 swings: LL → LH → HL → HH",
+      "Mixed highs/lows — no clear one-sided structure."
+     ]
+    },
+    "srLevels": [
+     {
+      "price": 184.715,
+      "touches": 4,
+      "kind": "flip",
+      "strength": 5,
+      "firstIdx": 43,
+      "lastIdx": 110
+     },
+     {
+      "price": 193.19,
+      "touches": 4,
+      "kind": "flip",
+      "strength": 4,
+      "firstIdx": 25,
+      "lastIdx": 88
+     },
+     {
+      "price": 180.33,
+      "touches": 2,
+      "kind": "flip",
+      "strength": 2,
+      "firstIdx": 57,
+      "lastIdx": 62
+     },
+     {
+      "price": 189.87,
+      "touches": 2,
+      "kind": "support",
+      "strength": 2,
+      "firstIdx": 27,
+      "lastIdx": 31
+     },
+     {
+      "price": 197.415,
+      "touches": 2,
+      "kind": "support",
+      "strength": 2,
+      "firstIdx": 85,
+      "lastIdx": 91
+     }
+    ],
+    "fib": {
+     "from": {
+      "i": 91,
+      "price": 197.05,
+      "kind": "H",
+      "label": "LH"
+     },
+     "to": {
+      "i": 106,
+      "price": 184.61,
+      "kind": "L",
+      "label": "LL"
+     },
+     "direction": "down",
+     "levels": [
+      {
+       "ratio": 0,
+       "price": 184.61
+      },
+      {
+       "ratio": 0.236,
+       "price": 187.5458
+      },
+      {
+       "ratio": 0.382,
+       "price": 189.3621
+      },
+      {
+       "ratio": 0.5,
+       "price": 190.83
+      },
+      {
+       "ratio": 0.618,
+       "price": 192.2979
+      },
+      {
+       "ratio": 0.786,
+       "price": 194.3878
+      },
+      {
+       "ratio": 1,
+       "price": 197.05
+      }
+     ]
+    }
+   }
   }
  },
  {
@@ -3229,7 +3443,95 @@
     "2026-04-27",
     "2026-05-27",
     "2026-06-26"
-   ]
+   ],
+   "peaks": {
+    "params": {
+     "mode": "lookback",
+     "reversalPct": null,
+     "atrMult": null,
+     "lookback": 4
+    },
+    "points": [
+     {
+      "i": 33,
+      "price": 185.39,
+      "kind": "H",
+      "label": "H"
+     },
+     {
+      "i": 58,
+      "price": 171.81,
+      "kind": "L",
+      "label": "L"
+     },
+     {
+      "i": 84,
+      "price": 189.32,
+      "kind": "H",
+      "label": "HH"
+     },
+     {
+      "i": 113,
+      "price": 173.7,
+      "kind": "L",
+      "label": "HL"
+     }
+    ],
+    "trend": {
+     "trend": "uptrend",
+     "confidence": 1,
+     "reasons": [
+      "Last 2 swings: HH → HL",
+      "Rising highs and rising lows — buyers in control."
+     ]
+    },
+    "srLevels": [],
+    "fib": {
+     "from": {
+      "i": 58,
+      "price": 171.81,
+      "kind": "L",
+      "label": "L"
+     },
+     "to": {
+      "i": 84,
+      "price": 189.32,
+      "kind": "H",
+      "label": "HH"
+     },
+     "direction": "up",
+     "levels": [
+      {
+       "ratio": 0,
+       "price": 189.32
+      },
+      {
+       "ratio": 0.236,
+       "price": 185.1876
+      },
+      {
+       "ratio": 0.382,
+       "price": 182.6312
+      },
+      {
+       "ratio": 0.5,
+       "price": 180.565
+      },
+      {
+       "ratio": 0.618,
+       "price": 178.4988
+      },
+      {
+       "ratio": 0.786,
+       "price": 175.5571
+      },
+      {
+       "ratio": 1,
+       "price": 171.81
+      }
+     ]
+    }
+   }
   }
  },
  {
@@ -4827,7 +5129,110 @@
     "2026-06-24",
     "2026-06-25",
     "2026-06-26"
-   ]
+   ],
+   "peaks": {
+    "params": {
+     "mode": "lookback",
+     "reversalPct": null,
+     "atrMult": null,
+     "lookback": 3
+    },
+    "points": [
+     {
+      "i": 33,
+      "price": 71.99,
+      "kind": "H",
+      "label": "H"
+     },
+     {
+      "i": 61,
+      "price": 58.07,
+      "kind": "L",
+      "label": "L"
+     },
+     {
+      "i": 82,
+      "price": 77.07,
+      "kind": "H",
+      "label": "HH"
+     },
+     {
+      "i": 113,
+      "price": 57.58,
+      "kind": "L",
+      "label": "LL"
+     },
+     {
+      "i": 136,
+      "price": 76,
+      "kind": "H",
+      "label": "LH"
+     }
+    ],
+    "trend": {
+     "trend": "downtrend",
+     "confidence": 0.67,
+     "reasons": [
+      "Last 3 swings: HH → LL → LH",
+      "Falling highs and falling lows — sellers in control."
+     ]
+    },
+    "srLevels": [
+     {
+      "price": 57.825,
+      "touches": 2,
+      "kind": "support",
+      "strength": 3,
+      "firstIdx": 61,
+      "lastIdx": 113
+     }
+    ],
+    "fib": {
+     "from": {
+      "i": 82,
+      "price": 77.07,
+      "kind": "H",
+      "label": "HH"
+     },
+     "to": {
+      "i": 113,
+      "price": 57.58,
+      "kind": "L",
+      "label": "LL"
+     },
+     "direction": "down",
+     "levels": [
+      {
+       "ratio": 0,
+       "price": 57.58
+      },
+      {
+       "ratio": 0.236,
+       "price": 62.1796
+      },
+      {
+       "ratio": 0.382,
+       "price": 65.0252
+      },
+      {
+       "ratio": 0.5,
+       "price": 67.325
+      },
+      {
+       "ratio": 0.618,
+       "price": 69.6248
+      },
+      {
+       "ratio": 0.786,
+       "price": 72.8991
+      },
+      {
+       "ratio": 1,
+       "price": 77.07
+      }
+     ]
+    }
+   }
   }
  },
  {
@@ -6472,7 +6877,248 @@
     "2026-06-12",
     "2026-06-19",
     "2026-06-26"
-   ]
+   ],
+   "peaks": {
+    "params": {
+     "mode": "lookback",
+     "reversalPct": null,
+     "atrMult": null,
+     "lookback": 2
+    },
+    "points": [
+     {
+      "i": 30,
+      "price": 140.72,
+      "kind": "H",
+      "label": "H"
+     },
+     {
+      "i": 55,
+      "price": 123,
+      "kind": "L",
+      "label": "L"
+     },
+     {
+      "i": 56,
+      "price": 125.93,
+      "kind": "H",
+      "label": "LH"
+     },
+     {
+      "i": 58,
+      "price": 122.95,
+      "kind": "L",
+      "label": "LL"
+     },
+     {
+      "i": 60,
+      "price": 126.64,
+      "kind": "H",
+      "label": "HH"
+     },
+     {
+      "i": 62,
+      "price": 123.66,
+      "kind": "L",
+      "label": "HL"
+     },
+     {
+      "i": 75,
+      "price": 137.08,
+      "kind": "H",
+      "label": "HH"
+     },
+     {
+      "i": 77,
+      "price": 134.41,
+      "kind": "L",
+      "label": "HL"
+     },
+     {
+      "i": 79,
+      "price": 137.38,
+      "kind": "H",
+      "label": "HH"
+     },
+     {
+      "i": 85,
+      "price": 136.03,
+      "kind": "L",
+      "label": "HL"
+     },
+     {
+      "i": 85,
+      "price": 138.64,
+      "kind": "H",
+      "label": "HH"
+     },
+     {
+      "i": 96,
+      "price": 131.29,
+      "kind": "L",
+      "label": "LL"
+     },
+     {
+      "i": 100,
+      "price": 133.07,
+      "kind": "H",
+      "label": "LH"
+     },
+     {
+      "i": 106,
+      "price": 125.62,
+      "kind": "L",
+      "label": "LL"
+     },
+     {
+      "i": 110,
+      "price": 129.3,
+      "kind": "H",
+      "label": "LH"
+     },
+     {
+      "i": 114,
+      "price": 125.77,
+      "kind": "L",
+      "label": "HL"
+     },
+     {
+      "i": 115,
+      "price": 129.52,
+      "kind": "H",
+      "label": "HH"
+     },
+     {
+      "i": 117,
+      "price": 126.3,
+      "kind": "L",
+      "label": "HL"
+     },
+     {
+      "i": 128,
+      "price": 140.77,
+      "kind": "H",
+      "label": "HH"
+     },
+     {
+      "i": 131,
+      "price": 138.45,
+      "kind": "L",
+      "label": "HL"
+     }
+    ],
+    "trend": {
+     "trend": "uptrend",
+     "confidence": 1,
+     "reasons": [
+      "Last 4 swings: HH → HL → HH → HL",
+      "Rising highs and rising lows — buyers in control."
+     ]
+    },
+    "srLevels": [
+     {
+      "price": 126.052,
+      "touches": 5,
+      "kind": "flip",
+      "strength": 6,
+      "firstIdx": 56,
+      "lastIdx": 117
+     },
+     {
+      "price": 123.2033,
+      "touches": 3,
+      "kind": "support",
+      "strength": 3,
+      "firstIdx": 55,
+      "lastIdx": 62
+     },
+     {
+      "price": 136.83,
+      "touches": 3,
+      "kind": "flip",
+      "strength": 3,
+      "firstIdx": 75,
+      "lastIdx": 85
+     },
+     {
+      "price": 129.41,
+      "touches": 2,
+      "kind": "support",
+      "strength": 3,
+      "firstIdx": 110,
+      "lastIdx": 115
+     },
+     {
+      "price": 138.545,
+      "touches": 2,
+      "kind": "flip",
+      "strength": 3,
+      "firstIdx": 85,
+      "lastIdx": 131
+     },
+     {
+      "price": 140.745,
+      "touches": 2,
+      "kind": "support",
+      "strength": 3,
+      "firstIdx": 30,
+      "lastIdx": 128
+     },
+     {
+      "price": 133.74,
+      "touches": 2,
+      "kind": "flip",
+      "strength": 2,
+      "firstIdx": 77,
+      "lastIdx": 100
+     }
+    ],
+    "fib": {
+     "from": {
+      "i": 117,
+      "price": 126.3,
+      "kind": "L",
+      "label": "HL"
+     },
+     "to": {
+      "i": 128,
+      "price": 140.77,
+      "kind": "H",
+      "label": "HH"
+     },
+     "direction": "up",
+     "levels": [
+      {
+       "ratio": 0,
+       "price": 140.77
+      },
+      {
+       "ratio": 0.236,
+       "price": 137.3551
+      },
+      {
+       "ratio": 0.382,
+       "price": 135.2425
+      },
+      {
+       "ratio": 0.5,
+       "price": 133.535
+      },
+      {
+       "ratio": 0.618,
+       "price": 131.8275
+      },
+      {
+       "ratio": 0.786,
+       "price": 129.3966
+      },
+      {
+       "ratio": 1,
+       "price": 126.3
+      }
+     ]
+    }
+   }
   }
  },
  {

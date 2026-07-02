@@ -231,7 +231,6 @@ export default function AdvancedChart({ data, view, setView, W = 1200, H = 640, 
         <rect x={x(i) - bodyW / 2} y={top} width={bodyW} height={bh} fill={col} rx={0.5} />
       </g>
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [candles, start, count, slot, bodyW, logScale, lo, hi, pricePanel.h]);
 
   // Bollinger band shading: upper path forward + lower path reversed.
@@ -244,7 +243,6 @@ export default function AdvancedChart({ data, view, setView, W = 1200, H = 640, 
     }
     if (up.length < 2) return null;
     return <path d={`M ${up.join(" L ")} L ${dn.reverse().join(" L ")} Z`} fill={C.blue} opacity={0.07} />;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [overlays.boll, series.boll, start, count, slot, logScale, lo, hi, pricePanel.h]);
 
   // ── peaks & troughs overlays ──

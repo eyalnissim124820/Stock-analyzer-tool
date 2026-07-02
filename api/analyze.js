@@ -12,6 +12,7 @@
 
 const { analyze, conclude } = require("./_engine.js");
 const { resolveTase } = require("./_tase.js");
+const { analyzePeaks } = require("./_peaks.js");
 
 // Map the UI timeframe to Yahoo's interval + a range that yields
 // ~60–120 candles (the engine needs ~30+ to fill every check).
@@ -113,6 +114,9 @@ module.exports = async (req, res) => {
       candles: data.candles,
       series: result.series,
       dates: data.dates,
+      // Peaks & Troughs structure (additive) — lookback mode with the same
+      // swingN as the verdict's pivots, so the zigzag mirrors the analysis.
+      peaks: analyzePeaks(data.candles, { mode: "lookback", lookback: n }),
     });
   } catch (e) {
     return res.status(502).json({ error: e.message || "Fetch/analysis failed" });

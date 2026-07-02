@@ -1033,7 +1033,7 @@ function TierSelector({ tier, setTier }) {
 // The SVG plot itself, windowed on `view = {start, count}`. Owns its own pointer
 // interactions (hover crosshair, wheel zoom/pan, drag pan) so it can be mounted
 // twice (inline + expanded) at different W/H while sharing tier/view with the parent.
-function ChartCanvas({ data, tier, view, setView, W, H, maxH }) {
+function ChartCanvas({ data, tier, view, setView, W, H, maxH, structure }) {
   const [hover, setHover] = useState(null);
   const [dragging, setDragging] = useState(false);
   const svgRef = useRef(null);
@@ -1259,6 +1259,40 @@ function ChartCanvas({ data, tier, view, setView, W, H, maxH }) {
           <circle key={`pl${j}`} cx={x(p.i)} cy={y(p.price) + 5} r={2.4} fill={C.red} />
         ))}
 
+        {/* Structure: zigzag through the peaks & troughs with HH/HL/LH/LL
+            labels (server-computed with the same swingN as the verdict). */}
+        {structure && (data.peaks?.points || []).length >= 2 && (() => {
+          const pts = data.peaks.points;
+          const AMBER = "#E0A458";
+          const last = pts[pts.length - 1];
+          const confirmed = last.provisional ? pts.slice(0, -1) : pts;
+          const solid = confirmed.map((p) => `${x(p.i).toFixed(1)},${y(p.price).toFixed(1)}`);
+          const prev = pts[pts.length - 2];
+          return (
+            <g>
+              {solid.length >= 2 && <polyline points={solid.join(" ")} fill="none" stroke={AMBER} strokeWidth={2} strokeLinejoin="round" opacity={0.9} />}
+              {last.provisional && prev && (
+                <line x1={x(prev.i)} y1={y(prev.price)} x2={x(last.i)} y2={y(last.price)}
+                  stroke={AMBER} strokeWidth={2} strokeDasharray="5 4" opacity={0.9} />
+              )}
+              {pts.filter((p) => p.i >= start && p.i < end).map((p, j) => {
+                const isH = p.kind === "H";
+                const bull = p.label === "HH" || p.label === "HL";
+                const labCol = p.label.length === 2 ? (bull ? C.green : C.red) : C.t50;
+                return (
+                  <g key={j}>
+                    <circle cx={x(p.i)} cy={y(p.price)} r={2.8} fill={AMBER} />
+                    {slot >= 9 && (
+                      <text x={x(p.i)} y={y(p.price) + (isH ? -7 : 14)} textAnchor="middle"
+                        fill={labCol} style={{ font: `700 10px ${FONT}` }}>{p.label}</text>
+                    )}
+                  </g>
+                );
+              })}
+            </g>
+          );
+        })()}
+
         {/* Core+: trade levels */}
         {showLevels && level(m.highestHigh, C.green, "Target")}
         {showLevels && level(m.buy, C.blue, "Buy")}
@@ -1278,6 +1312,7 @@ function ChartCanvas({ data, tier, view, setView, W, H, maxH }) {
 
 function AnalysisChart({ data, isMobile }) {
   const [tier, setTier] = useState("Core");
+  const [structure, setStructure] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const N = data?.candles?.close?.length || 0;
   const [view, setView] = useState({ start: 0, count: N });
@@ -1301,6 +1336,15 @@ function AnalysisChart({ data, isMobile }) {
       borderRadius: 40, border: "none", cursor: "pointer", background: C.chip, color: "#fff",
     }}>⤢ Expand</button>
   );
+  // Peaks & Troughs zigzag overlay — only offered when the response carries
+  // the (additive) peaks field, so stale cached scans degrade gracefully.
+  const structureBtn = data.peaks ? (
+    <button onClick={() => setStructure(!structure)} title="Peaks & troughs zigzag with HH/HL/LH/LL labels" style={{
+      font: `700 12px ${FONT}`, padding: "6px 12px", borderRadius: 40, border: "none", cursor: "pointer",
+      background: structure ? C.chip : "transparent", color: structure ? "#E0A458" : C.t50,
+      boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.08)",
+    }}>Structure</button>
+  ) : null;
   const hint = (
     <span style={{ font: `400 11px ${FONT}`, color: C.t50 }}>Scroll to zoom · Shift-scroll or drag to pan</span>
   );
@@ -1316,14 +1360,15 @@ function AnalysisChart({ data, isMobile }) {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <TierSelector tier={tier} setTier={setTier} />
+            {structureBtn}
             {expandBtn}
           </div>
         </div>
 
-        <ChartCanvas data={data} tier={tier} view={view} setView={setView} W={720} H={isMobile ? 280 : 340} />
+        <ChartCanvas data={data} tier={tier} structure={structure} view={view} setView={setView} W={720} H={isMobile ? 280 : 340} />
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <ChartLegend tier={tier} />
+          <ChartLegend tier={tier} structure={structure} />
           {hint}
         </div>
       </div>
@@ -1343,15 +1388,16 @@ function AnalysisChart({ data, isMobile }) {
               <span style={{ font: `700 20px ${FONT}`, color: "#fff" }}>Chart — {data.name || data.ticker}</span>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <TierSelector tier={tier} setTier={setTier} />
+                {structureBtn}
                 <button onClick={() => setExpanded(false)} aria-label="Close" title="Close" style={{
                   width: 34, height: 34, borderRadius: "50%", border: "none", cursor: "pointer",
                   background: C.chip, color: "#fff", font: `700 16px ${FONT}`,
                 }}>✕</button>
               </div>
             </div>
-            <ChartCanvas data={data} tier={tier} view={view} setView={setView} W={1200} H={620} maxH="74vh" />
+            <ChartCanvas data={data} tier={tier} structure={structure} view={view} setView={setView} W={1200} H={620} maxH="74vh" />
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <ChartLegend tier={tier} />
+              <ChartLegend tier={tier} structure={structure} />
               {hint}
             </div>
           </div>
@@ -1361,7 +1407,7 @@ function AnalysisChart({ data, isMobile }) {
   );
 }
 
-function ChartLegend({ tier }) {
+function ChartLegend({ tier, structure }) {
   const dot = (color, round) => ({ width: 12, height: round ? 12 : 3, borderRadius: round ? "50%" : 2, background: color, flexShrink: 0 });
   const item = (node, label) => (
     <span style={{ display: "flex", alignItems: "center", gap: 6, font: `400 11px ${FONT}`, color: C.t70 }}>{node}{label}</span>
@@ -1370,6 +1416,7 @@ function ChartLegend({ tier }) {
     <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px" }}>
       {item(<span style={dot(C.green)} />, "Green line (13 SMA)")}
       {item(<span style={dot(C.red)} />, "Red line (5 SMA)")}
+      {structure && item(<span style={dot("#E0A458")} />, "Peaks & troughs (HH/HL/LH/LL)")}
       {tier !== "Minimal" && item(<span style={{ ...dot(C.blue), borderRadius: 0 }} />, "Buy / Stop / Target levels")}
       {tier === "Full" && item(<span style={dot(C.green, true)} />, "Swing pivots")}
       {tier === "Full" && item(<span style={dot("#9AA0AE")} />, "Lower Bollinger (10/1)")}
