@@ -4,7 +4,8 @@
   "outputDirectory": "dist",
   "functions": {
     "api/analyze.js": { "maxDuration": 10 },
-    "api/strategy.js": { "maxDuration": 15 }
+    "api/strategy.js": { "maxDuration": 15 },
+    "api/chart.js": { "maxDuration": 10 }
   },
   "rewrites": [
     { "source": "/hebrew", "destination": "/hebrew.html" }
