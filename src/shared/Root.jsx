@@ -3,13 +3,15 @@ import { C, INSET, fontFor } from "./design.js";
 import { T } from "../strategy/strings.js";
 import StrategyApp from "../strategy/StrategyApp.jsx";
 import TrackerApp from "../tracker/TrackerApp.jsx";
+import ChartApp from "../chart/ChartApp.jsx";
 
 // ─────────────────────────────────────────────────────────────
-// Root — hosts the three tools and a persistent in-app mode toggle.
+// Root — hosts the tools and a persistent in-app mode toggle.
 //   • "analyzer" → the original 9-Question tool (passed in as `Analyzer`,
 //     rendered completely unchanged).
 //   • "strategy" → the Sequence-Method (Strategy & Tactics) tool.
 //   • "tracker"  → the Monthly Tracker (watchlist & buy alerts) tool.
+//   • "chart"    → the Advanced Chart tool (English-first for now).
 //
 // The toggle is a floating segmented control. It is pinned (not inserted into
 // any tool's layout) specifically so the first tool stays byte-for-byte
@@ -22,17 +24,22 @@ export default function Root({ lang = "en", Analyzer }) {
 
   return (
     <>
-      {mode === "analyzer" ? <Analyzer /> : mode === "strategy" ? <StrategyApp lang={lang} /> : <TrackerApp lang={lang} />}
-      <ModeToggle mode={mode} setMode={setMode} t={t} font={font} dir={t.dir} />
+      {mode === "analyzer" ? <Analyzer />
+        : mode === "strategy" ? <StrategyApp lang={lang} />
+        : mode === "tracker" ? <TrackerApp lang={lang} />
+        : <ChartApp lang={lang} />}
+      <ModeToggle mode={mode} setMode={setMode} t={t} font={font} dir={t.dir} lang={lang} />
     </>
   );
 }
 
-function ModeToggle({ mode, setMode, t, font, dir }) {
+function ModeToggle({ mode, setMode, t, font, dir, lang }) {
   const opts = [
     { key: "analyzer", label: t.modeAnalyzer },
     { key: "strategy", label: t.modeStrategy },
     { key: "tracker", label: t.modeTracker },
+    // Advanced Chart ships English-first; the Hebrew app gets it in a follow-up.
+    ...(lang === "en" ? [{ key: "chart", label: t.modeChart }] : []),
   ];
   return (
     <div

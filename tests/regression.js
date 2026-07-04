@@ -24,15 +24,21 @@ const SCENARIOS = [
   { api: "strategy", q: { ticker: "MSFT", market: "US", technique: "2", timeframe: "Daily" } },
   { api: "strategy", q: { ticker: "TEVA", market: "TLV", technique: "2", timeframe: "Weekly", lang: "he" } },
   { api: "strategy", q: { ticker: "LUMI.TA", market: "TLV", technique: "1" } },
+  { api: "chart", q: { ticker: "AAPL", market: "US", range: "1Y" } },
+  { api: "chart", q: { ticker: "TEVA.TA", market: "TLV", range: "6M", zigzagMode: "lookback", sensitivity: "7" } },
+  { api: "chart", q: {} }, // missing ticker → 400
 ];
 
 async function collect() {
   installFetchStub();
-  const analyze = require("../api/analyze.js");
-  const strategy = require("../api/strategy.js");
+  const handlers = {
+    analyze: require("../api/analyze.js"),
+    strategy: require("../api/strategy.js"),
+    chart: require("../api/chart.js"),
+  };
   const out = [];
   for (const s of SCENARIOS) {
-    const res = await runHandler(s.api === "analyze" ? analyze : strategy, { ...s.q });
+    const res = await runHandler(handlers[s.api], { ...s.q });
     out.push({ scenario: s, status: res.statusCode, body: res.body });
   }
   return JSON.stringify(out, null, 1);
