@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { C, INSET, fontFor } from "./design.js";
 import { T } from "../strategy/strings.js";
 import StrategyApp from "../strategy/StrategyApp.jsx";
+import ChartApp from "../chart/ChartApp.jsx";
 
 // ─────────────────────────────────────────────────────────────
 // Root — hosts the two tools and a persistent in-app mode toggle.
@@ -20,16 +21,18 @@ export default function Root({ lang = "en", Analyzer }) {
 
   return (
     <>
-      {mode === "analyzer" ? <Analyzer /> : <StrategyApp lang={lang} />}
-      <ModeToggle mode={mode} setMode={setMode} t={t} font={font} dir={t.dir} />
+      {mode === "analyzer" ? <Analyzer /> : mode === "chart" ? <ChartApp lang={lang} /> : <StrategyApp lang={lang} />}
+      <ModeToggle mode={mode} setMode={setMode} t={t} font={font} dir={t.dir} lang={lang} />
     </>
   );
 }
 
-function ModeToggle({ mode, setMode, t, font, dir }) {
+function ModeToggle({ mode, setMode, t, font, dir, lang }) {
   const opts = [
     { key: "analyzer", label: t.modeAnalyzer },
     { key: "strategy", label: t.modeStrategy },
+    // Advanced Chart ships English-first; the Hebrew app gets it in a follow-up.
+    ...(lang === "en" ? [{ key: "chart", label: t.modeChart }] : []),
   ];
   return (
     <div
