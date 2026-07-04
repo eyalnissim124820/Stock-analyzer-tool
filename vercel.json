@@ -5,6 +5,7 @@
   "functions": {
     "api/analyze.js": { "maxDuration": 10 },
     "api/strategy.js": { "maxDuration": 15 },
+    "api/tracker.js": { "maxDuration": 10 },
     "api/chart.js": { "maxDuration": 10 }
   },
   "rewrites": [

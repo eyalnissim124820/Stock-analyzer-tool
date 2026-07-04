@@ -1,7 +1,7 @@
-# Stock Analyzer — two methods, one app
+# Stock Analyzer — three methods, one app
 
 A React + Vercel app with a persistent in-app **mode toggle** (bottom-center)
-that switches between two independent analysis tools sharing the same design
+that switches between three independent analysis tools sharing the same design
 system and the same Yahoo data layer:
 
 1. **9-Question Method** (`/api/analyze`, `src/App.jsx`) — the original tool,
@@ -14,6 +14,22 @@ system and the same Yahoo data layer:
    (T1–T2), then buy-timing options, position management, and sell signals. Uses
    ONLY the method's inputs (candles, MA5/MA20/MA40, volume, CCI(5), Bollinger,
    sequence structure) — no RSI, MACD, Fibonacci, news, earnings, or sentiment.
+3. **Monthly Tracker — watchlist & buy alerts** (`/api/tracker`,
+   `src/tracker/TrackerApp.jsx`) — a third tool that decides whether a stock
+   belongs on this month's tracking list. Seven checks on the MONTHLY chart:
+   N1 tradable (average daily volume above 1,000,000; 800,000 is the lenient
+   bar) → N2 rising sequence → N3 the whole last candle, including its lower
+   tail, above MA5 → N4 MA5 sloping upward → N5 the last closed candle is
+   green → N6 its close above the previous candle's high → N7 its close in the
+   top third of its own range (near its high). All seven pass ⇒ **Add to
+   tracking** (the last candle is the buy alert); N1–N4 pass without an alert
+   candle ⇒ **Trend OK — no alert candle** (re-check next month); otherwise
+   **Not for tracking**. N2–N7 run on the last CLOSED monthly candle — a bar
+   from the still-running calendar month shows on the chart but never votes.
+   The liquidity number is the ~20-day average of Yahoo's daily share volume.
+   Supports single scans and batch CSV scans (`Ticker,Market` columns),
+   including TASE numbers/names. Logic lives in the pure `api/_tracker.js`
+   (`node tests/tracker.test.js` runs it offline).
 
 Both tools exist in English (`index.html`) and Hebrew (`hebrew.html`). The new
 Sequence tool is one locale-parameterized component used by both languages; its
