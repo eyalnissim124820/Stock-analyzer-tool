@@ -892,11 +892,15 @@ export function ChartCanvas({ data, tier, view, setView, W, H, maxH, font }) {
     return Math.max(start, Math.min(visLast, Math.round((vbX - padL) / slot - 0.5) + start));
   };
   function onMouseMove(e) {
-    if (dragRef.current) {
+    // Capture the drag ref up front: the setView updater runs asynchronously,
+    // and a concurrent mouseup can null dragRef.current before it does —
+    // reading the ref inside the updater then crashes the tree.
+    const drag = dragRef.current;
+    if (drag) {
       const r = svgRef.current?.getBoundingClientRect();
       if (!r) return;
-      const dCandles = -Math.round(((e.clientX - dragRef.current.startX) / r.width) * W / slot);
-      setView((vw) => { const cc = Math.max(2, Math.min(vw.count, N)); return { start: Math.max(0, Math.min(N - cc, dragRef.current.startStart + dCandles)), count: cc }; });
+      const dCandles = -Math.round(((e.clientX - drag.startX) / r.width) * W / slot);
+      setView((vw) => { const cc = Math.max(2, Math.min(vw.count, N)); return { start: Math.max(0, Math.min(N - cc, drag.startStart + dCandles)), count: cc }; });
       return;
     }
     setHover(clientToIdx(e.clientX));
