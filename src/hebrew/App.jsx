@@ -1114,14 +1114,18 @@ function ChartCanvas({ data, tier, view, setView, W, H, maxH }) {
   };
 
   function onMouseMove(e) {
-    if (dragRef.current) {
+    // Capture the drag ref up front: the setView updater runs asynchronously,
+    // and a concurrent mouseup can null dragRef.current before it does —
+    // reading the ref inside the updater then crashes the tree.
+    const drag = dragRef.current;
+    if (drag) {
       const r = svgRef.current?.getBoundingClientRect();
       if (!r) return;
-      const dxPx = e.clientX - dragRef.current.startX;
+      const dxPx = e.clientX - drag.startX;
       const dCandles = -Math.round((dxPx / r.width) * W / slot);
       setView((v) => {
         const cc = Math.max(2, Math.min(v.count, N));
-        const st = Math.max(0, Math.min(N - cc, dragRef.current.startStart + dCandles));
+        const st = Math.max(0, Math.min(N - cc, drag.startStart + dCandles));
         return { start: st, count: cc };
       });
       return; // הסתרת הצלב בזמן הזזה
