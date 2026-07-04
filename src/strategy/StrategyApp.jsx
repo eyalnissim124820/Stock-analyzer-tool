@@ -834,7 +834,9 @@ function AnalysisChart({ data, t, font, dir, isMobile }) {
   );
 }
 
-function ChartCanvas({ data, tier, view, setView, W, H, maxH, font }) {
+// Exported: the Monthly Tracker tool reuses this canvas (tier "Minimal",
+// series = {ma5} only) so both tools render the exact same chart.
+export function ChartCanvas({ data, tier, view, setView, W, H, maxH, font }) {
   const [hover, setHover] = useState(null);
   const [dragging, setDragging] = useState(false);
   const svgRef = useRef(null);

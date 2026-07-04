@@ -2,15 +2,17 @@ import React, { useState } from "react";
 import { C, INSET, fontFor } from "./design.js";
 import { T } from "../strategy/strings.js";
 import StrategyApp from "../strategy/StrategyApp.jsx";
+import TrackerApp from "../tracker/TrackerApp.jsx";
 
 // ─────────────────────────────────────────────────────────────
-// Root — hosts the two tools and a persistent in-app mode toggle.
+// Root — hosts the three tools and a persistent in-app mode toggle.
 //   • "analyzer" → the original 9-Question tool (passed in as `Analyzer`,
 //     rendered completely unchanged).
-//   • "strategy" → the new Sequence-Method (Strategy & Tactics) tool.
+//   • "strategy" → the Sequence-Method (Strategy & Tactics) tool.
+//   • "tracker"  → the Monthly Tracker (watchlist & buy alerts) tool.
 //
 // The toggle is a floating segmented control. It is pinned (not inserted into
-// either tool's layout) specifically so the first tool stays byte-for-byte
+// any tool's layout) specifically so the first tool stays byte-for-byte
 // untouched — Root never reaches into App.jsx. Same design system throughout.
 // ─────────────────────────────────────────────────────────────
 export default function Root({ lang = "en", Analyzer }) {
@@ -20,7 +22,7 @@ export default function Root({ lang = "en", Analyzer }) {
 
   return (
     <>
-      {mode === "analyzer" ? <Analyzer /> : <StrategyApp lang={lang} />}
+      {mode === "analyzer" ? <Analyzer /> : mode === "strategy" ? <StrategyApp lang={lang} /> : <TrackerApp lang={lang} />}
       <ModeToggle mode={mode} setMode={setMode} t={t} font={font} dir={t.dir} />
     </>
   );
@@ -30,6 +32,7 @@ function ModeToggle({ mode, setMode, t, font, dir }) {
   const opts = [
     { key: "analyzer", label: t.modeAnalyzer },
     { key: "strategy", label: t.modeStrategy },
+    { key: "tracker", label: t.modeTracker },
   ];
   return (
     <div
