@@ -15,19 +15,34 @@ import ChartApp from "../chart/ChartApp.jsx";
 //
 // The toggle is a floating segmented control, pinned (not inserted into any
 // tool's layout) so each tool owns its own layout. Root also owns the cross-
-// tool "Graph" jump: a right-click "Graph" in any scan tool preloads the stock
-// into Chart mode via `openChart`. Same design system throughout.
+// tool "Graph" jump: a right-click "Graph" in any scan tool opens the Chart
+// tool in a NEW browser tab with the stock preloaded via the URL. Same design
+// system throughout.
 // ─────────────────────────────────────────────────────────────
+
+// Read a "Graph" deep-link off the URL (?tool=chart&symbol=AAPL&market=US).
+// Chart mode ships English-first, so the deep link is only honored there.
+function readChartDeepLink(lang) {
+  if (lang !== "en" || typeof window === "undefined") return null;
+  const p = new URLSearchParams(window.location.search);
+  const symbol = p.get("symbol");
+  if (p.get("tool") !== "chart" || !symbol) return null;
+  return { symbol, market: p.get("market") === "TLV" ? "TLV" : "US" };
+}
+
 export default function Root({ lang = "en", Analyzer }) {
-  const [mode, setMode] = useState("analyzer");
-  const [chartTarget, setChartTarget] = useState(null); // { symbol, market } from a "Graph" click
+  const [deepLink] = useState(() => readChartDeepLink(lang)); // { symbol, market } | null
+  const [mode, setMode] = useState(deepLink ? "chart" : "analyzer");
   const t = T[lang] || T.en;
   const font = fontFor(lang);
 
-  // Chart mode ships English-first (see ModeToggle), so the Graph jump is only
-  // wired for English. A fresh object each call re-triggers ChartApp's loader.
+  // Right-click "Graph" opens the Chart tool in a new browser tab, deep-linked
+  // to the stock. Chart mode ships English-first, so the jump is en-only.
   const openChart = lang === "en"
-    ? (target) => { setChartTarget({ ...target }); setMode("chart"); }
+    ? (target) => {
+        const params = new URLSearchParams({ tool: "chart", symbol: target.symbol || "", market: target.market || "US" });
+        window.open(`${window.location.pathname}?${params}`, "_blank", "noopener");
+      }
     : undefined;
 
   return (
@@ -35,7 +50,7 @@ export default function Root({ lang = "en", Analyzer }) {
       {mode === "analyzer" ? <Analyzer onOpenChart={openChart} />
         : mode === "strategy" ? <StrategyApp lang={lang} onOpenChart={openChart} />
         : mode === "tracker" ? <TrackerApp lang={lang} onOpenChart={openChart} />
-        : <ChartApp lang={lang} initial={chartTarget} />}
+        : <ChartApp lang={lang} initial={deepLink} />}
       <ModeToggle mode={mode} setMode={setMode} t={t} font={font} dir={t.dir} lang={lang} />
     </>
   );

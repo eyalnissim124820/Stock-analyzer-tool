@@ -71,9 +71,8 @@ export default function ChartApp({ lang = "en", initial = null }) {
     }
   }
 
-  // Preload a stock handed in from another tool's right-click "Graph" action.
-  // Root passes a fresh `initial` object on each Graph click, so re-graphing
-  // the same symbol still refires this effect.
+  // Preload a stock deep-linked from another tool's "Graph" action. This tab
+  // was opened with the stock in the URL; Root reads it and hands it in here.
   useEffect(() => {
     if (!initial || !initial.symbol) return;
     const mkt = initial.market || "US";
