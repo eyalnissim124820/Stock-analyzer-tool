@@ -23,6 +23,13 @@ function useWindowWidth() {
   return w;
 }
 
+// Candle interval → the range windows that keep a chartable bar count. Daily
+// bars cover shorter windows; weekly bars need ≥1Y to clear the API's minimum-
+// bar floor. The API maps each range key to a Yahoo window and honors the
+// interval override (see api/chart.js).
+const DAILY_RANGES = ["1M", "3M", "6M", "1Y", "2Y", "5Y"];
+const WEEKLY_RANGES = ["1Y", "2Y", "5Y", "Max"];
+
 export default function ChartApp({ lang = "en", initial = null }) {
   const t = CT[lang] || CT.en;
   const font = fontFor(lang);
@@ -30,8 +37,8 @@ export default function ChartApp({ lang = "en", initial = null }) {
 
   const [market, setMarket] = useState("US");
   const [symbol, setSymbol] = useState("");
+  const [barInterval, setBarInterval] = useState("1d"); // "1d" (daily) | "1wk" (weekly)
   const [range, setRange] = useState("1Y");
-  const [logScale, setLogScale] = useState(false);
   const [zigzagMode, setZigzagMode] = useState("percent");
   const [sensitivity, setSensitivity] = useState(5);
   const [ind, setInd] = useState(loadIndicators);
@@ -57,6 +64,7 @@ export default function ChartApp({ lang = "en", initial = null }) {
         ticker: tick,
         market: opts.market ?? market,
         range: opts.range ?? range,
+        interval: opts.interval ?? barInterval,
         zigzagMode: opts.zigzagMode ?? zigzagMode,
         sensitivity: String(opts.sensitivity ?? sensitivity),
       });
@@ -84,6 +92,15 @@ export default function ChartApp({ lang = "en", initial = null }) {
 
   // Range / mode changes refetch immediately; the sensitivity slider debounces.
   function onRange(r) { setRange(r); if (state.ticker) load(state.ticker, { range: r }); }
+  // Daily/Weekly candle view. Snap to a range that has enough bars for the new
+  // interval before refetching.
+  function onBarInterval(iv) {
+    const ranges = iv === "1wk" ? WEEKLY_RANGES : DAILY_RANGES;
+    const nextRange = ranges.includes(range) ? range : "1Y";
+    setBarInterval(iv);
+    if (nextRange !== range) setRange(nextRange);
+    if (state.ticker) load(state.ticker, { interval: iv, range: nextRange });
+  }
   function onZigzagMode(m) { setZigzagMode(m); if (state.ticker) load(state.ticker, { zigzagMode: m }); }
   function onSensitivity(s) {
     setSensitivity(s);
@@ -131,11 +148,15 @@ export default function ChartApp({ lang = "en", initial = null }) {
           <button onClick={() => load()} style={{ ...ctlBtn, background: "#fff", color: C.card }}>{t.load}</button>
 
           <div style={{ display: "flex", gap: 2, background: C.sub, borderRadius: 40, padding: 4 }}>
-            {t.ranges.map((r) => (
+            {["1d", "1wk"].map((iv) => (
+              <button key={iv} onClick={() => onBarInterval(iv)} style={pill(barInterval === iv)}>{t.interval[iv]}</button>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 2, background: C.sub, borderRadius: 40, padding: 4 }}>
+            {(barInterval === "1wk" ? WEEKLY_RANGES : DAILY_RANGES).map((r) => (
               <button key={r} onClick={() => onRange(r)} style={pill(range === r)}>{r}</button>
             ))}
           </div>
-          <button onClick={() => setLogScale(!logScale)} style={pill(logScale)} title="Logarithmic price scale">{t.logScale}</button>
         </div>
 
         {/* Structure controls + trend verdict */}
@@ -182,7 +203,7 @@ export default function ChartApp({ lang = "en", initial = null }) {
         {(state.status === "ready" || (state.status === "loading" && data)) && data && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12, opacity: state.status === "loading" ? 0.6 : 1, transition: "opacity .15s" }}>
             <AdvancedChart data={data} view={view} setView={setView}
-              W={1200} H={isMobile ? 480 : 640} logScale={logScale}
+              W={1200} H={isMobile ? 480 : 640}
               panels={ind.panels} overlays={ind.overlays} t={t} />
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
               <Legend ind={ind} t={t} font={font} />
