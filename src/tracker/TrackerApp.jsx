@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { C, INSET, fontFor } from "../shared/design.js";
 import { T, CHECK_TITLES } from "./strings.js";
 import { ChartCanvas } from "../strategy/StrategyApp.jsx";
+import GraphIcon from "../shared/GraphIcon.jsx";
 
 // ─────────────────────────────────────────────────────────────
 // TrackerApp — the Monthly Tracker (watchlist & buy alerts) tool.
@@ -127,8 +128,41 @@ function InfoCard({ children, font, color = C.t70 }) {
   return <div style={{ borderRadius: 16, background: C.sub, padding: "14px 18px", font: `400 14px ${font}`, color, lineHeight: 1.6 }}>{children}</div>;
 }
 
+// ── right-click menu (same behaviour as the other two tools) ──
+function ContextMenu({ x, y, items, onClose, font }) {
+  const ref = useRef(null);
+  const [pos, setPos] = useState({ left: x, top: y });
+  useEffect(() => {
+    const r = ref.current?.getBoundingClientRect();
+    const w = r?.width || 200, h = r?.height || 100, margin = 8;
+    setPos({ left: Math.max(margin, Math.min(x, window.innerWidth - w - margin)), top: Math.max(margin, Math.min(y, window.innerHeight - h - margin)) });
+  }, [x, y]);
+  useEffect(() => {
+    const close = () => onClose();
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("mousedown", close); window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close); window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("mousedown", close); window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); window.removeEventListener("keydown", onKey); };
+  }, [onClose]);
+  return (
+    <div ref={ref} onMouseDown={(e) => e.stopPropagation()} onContextMenu={(e) => e.preventDefault()}
+      style={{ position: "fixed", left: pos.left, top: pos.top, zIndex: 1100, minWidth: 160, background: C.card2, borderRadius: 12, padding: 6, boxShadow: `${INSET}, 0 12px 28px rgba(0,0,0,0.45)`, display: "flex", flexDirection: "column", gap: 2 }}>
+      {items.map((it, i) => <ContextItem key={i} item={it} onClose={onClose} font={font} />)}
+    </div>
+  );
+}
+function ContextItem({ item, onClose, font }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onClick={() => { item.onClick(); onClose(); }}
+      style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "start", padding: "9px 12px", borderRadius: 8, border: "none", cursor: "pointer", background: hover ? "rgba(255,255,255,0.08)" : "transparent", color: item.danger ? C.red : "#fff", font: `600 14px ${font}`, whiteSpace: "nowrap" }}>
+      {item.icon && <span style={{ width: 16, textAlign: "center" }}>{item.icon}</span>}{item.label}
+    </button>
+  );
+}
+
 // ── root component ──
-export default function TrackerApp({ lang = "en" }) {
+export default function TrackerApp({ lang = "en", onOpenChart }) {
   const t = T[lang] || T.en;
   const font = fontFor(lang);
   const dir = t.dir;
@@ -140,6 +174,7 @@ export default function TrackerApp({ lang = "en" }) {
   const [selectedId, setSelectedId] = useState(null);
   const [mobileDetail, setMobileDetail] = useState(false);
   const [batch, setBatch] = useState(null); // { rows, fileName } while the confirm popup is open
+  const [menu, setMenu] = useState(null); // { x, y, stock } — open right-click menu
   const nextId = useRef(1);
   const fileRef = useRef(null);
 
@@ -233,19 +268,25 @@ export default function TrackerApp({ lang = "en" }) {
   return (
     <div dir={dir} style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: isMobile ? "100dvh" : "100vh", width: "100%", background: C.bg, fontFamily: font, color: C.text, overflow: "hidden", ...(isMobile ? { paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" } : null) }}>
       {(!isMobile || !mobileDetail) && (
-        <Sidebar {...{ t, font, dir, isMobile, market, setMarket, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId: selectStock, removeStock, onBatch: openBatch, onDownloadDemo: downloadDemoFile }} />
+        <Sidebar {...{ t, font, dir, isMobile, market, setMarket, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId: selectStock, removeStock, onBatch: openBatch, onDownloadDemo: downloadDemoFile, onContext: (e, s) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY, stock: s }); } }} />
       )}
       {(!isMobile || mobileDetail) && (
         <Main {...{ t, font, dir, isMobile, onBack: () => setMobileDetail(false), stock: selected, setOverride, refresh: () => selected && !selected.loading && fetchStock({ rawSymbol: selected.display, market: selected.market, existingId: selected.id }) }} />
       )}
       <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onBatchFile} style={{ display: "none" }} />
       {batch && <BatchModal batch={batch} t={t} font={font} dir={dir} onScanAll={scanAll} onCancel={clearBatch} />}
+      {menu && (
+        <ContextMenu x={menu.x} y={menu.y} font={font} onClose={() => setMenu(null)} items={[
+          ...(onOpenChart ? [{ label: lang === "he" ? "גרף" : "Graph", icon: <GraphIcon />, onClick: () => onOpenChart({ symbol: menu.stock.display, market: menu.stock.market }) }] : []),
+          { label: lang === "he" ? "הסרה" : "Remove", icon: "×", danger: true, onClick: () => removeStock(menu.stock.id) },
+        ]} />
+      )}
     </div>
   );
 }
 
 // ── Sidebar ──
-function Sidebar({ t, font, dir, isMobile, market, setMarket, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId, removeStock, onBatch, onDownloadDemo }) {
+function Sidebar({ t, font, dir, isMobile, market, setMarket, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId, removeStock, onBatch, onDownloadDemo, onContext }) {
   const [focus, setFocus] = useState(false);
   const [batchHover, setBatchHover] = useState(false);
   const [demoHover, setDemoHover] = useState(false);
@@ -283,14 +324,14 @@ function Sidebar({ t, font, dir, isMobile, market, setMarket, symbol, setSymbol,
           </div>
         )}
         {stocks.map((s) => (
-          <StockRow key={s.id} {...{ s, t, font, dir, isMobile, selected: s.id === selectedId, onClick: () => !s.loading && setSelectedId(s.id), onRemove: () => removeStock(s.id) }} />
+          <StockRow key={s.id} {...{ s, t, font, dir, isMobile, selected: s.id === selectedId, onClick: () => !s.loading && setSelectedId(s.id), onRemove: () => removeStock(s.id), onContext }} />
         ))}
       </div>
     </aside>
   );
 }
 
-function StockRow({ s, t, font, dir, isMobile, selected, onClick, onRemove }) {
+function StockRow({ s, t, font, dir, isMobile, selected, onClick, onRemove, onContext }) {
   const [hover, setHover] = useState(false);
   const showX = isMobile ? !s.loading : hover;
   let chipBg = C.card2;
@@ -298,7 +339,7 @@ function StockRow({ s, t, font, dir, isMobile, selected, onClick, onRemove }) {
   else if (!s.loading && s.data) chipBg = VERDICT_COLOR[verdict(s.data, s.overrides).code] || C.card2;
   const sub = s.error ? t.failedShort : `${t.market[s.market]} · ${t.monthly}${s.data ? " · " + s.data.lastDate : ""}`;
   return (
-    <div onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+    <div onClick={onClick} onContextMenu={(e) => onContext && onContext(e, s)} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ position: "relative", display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 20, cursor: s.loading ? "default" : "pointer", transition: "background .12s", background: selected ? "rgba(255,255,255,0.06)" : hover ? "rgba(255,255,255,0.03)" : "transparent" }}>
       <div className={dir === "rtl" ? "ltr" : undefined} style={{ width: 80, height: 43, flexShrink: 0, borderRadius: 8, background: chipBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <span style={{ font: `700 16px ${font}`, color: "#fff" }}>{s.display}</span>

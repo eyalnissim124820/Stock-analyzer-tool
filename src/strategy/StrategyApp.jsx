@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { C, INSET, fontFor } from "../shared/design.js";
 import { T, CHECK_TITLES } from "./strings.js";
+import GraphIcon from "../shared/GraphIcon.jsx";
 
 // ─────────────────────────────────────────────────────────────
 // StrategyApp — the Sequence Method (Strategy & Tactics) tool.
@@ -297,7 +298,7 @@ function InfoCard({ children, font, color = C.t70 }) {
 }
 
 // ── root component ──
-export default function StrategyApp({ lang = "en" }) {
+export default function StrategyApp({ lang = "en", onOpenChart }) {
   const t = T[lang] || T.en;
   const font = fontFor(lang);
   const dir = t.dir;
@@ -433,6 +434,7 @@ export default function StrategyApp({ lang = "en" }) {
       {batch && <BatchModal batch={batch} t={t} font={font} dir={dir} onScanAll={scanAll} onCancel={clearBatch} />}
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} font={font} onClose={() => setMenu(null)} items={[
+          ...(onOpenChart ? [{ label: lang === "he" ? "גרף" : "Graph", icon: <GraphIcon />, onClick: () => onOpenChart({ symbol: menu.stock.display, market: menu.stock.market }) }] : []),
           { label: lang === "he" ? "הסרה" : "Remove", icon: "×", danger: true, onClick: () => removeStock(menu.stock.id) },
         ]} />
       )}

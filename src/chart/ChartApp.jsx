@@ -23,7 +23,7 @@ function useWindowWidth() {
   return w;
 }
 
-export default function ChartApp({ lang = "en" }) {
+export default function ChartApp({ lang = "en", initial = null }) {
   const t = CT[lang] || CT.en;
   const font = fontFor(lang);
   const isMobile = useWindowWidth() < 920;
@@ -70,6 +70,18 @@ export default function ChartApp({ lang = "en" }) {
       setState((s) => ({ ...s, status: "error", error: e.message }));
     }
   }
+
+  // Preload a stock handed in from another tool's right-click "Graph" action.
+  // Root passes a fresh `initial` object on each Graph click, so re-graphing
+  // the same symbol still refires this effect.
+  useEffect(() => {
+    if (!initial || !initial.symbol) return;
+    const mkt = initial.market || "US";
+    setMarket(mkt);
+    setSymbol(initial.symbol);
+    load(initial.symbol, { market: mkt });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial]);
 
   // Range / mode changes refetch immediately; the sensitivity slider debounces.
   function onRange(r) { setRange(r); if (state.ticker) load(state.ticker, { range: r }); }
