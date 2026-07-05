@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { C, INSET, fontFor } from "./design.js";
 import { T } from "../strategy/strings.js";
 import StrategyApp from "../strategy/StrategyApp.jsx";
@@ -56,13 +56,27 @@ export default function Root({ lang = "en", Analyzer }) {
   );
 }
 
+// Full tab labels don't fit a phone screen next to each other, so narrow
+// viewports get the compact labels + tighter padding (and the row scrolls
+// as a last resort instead of spilling out of the pill).
+function useIsNarrow(threshold = 560) {
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.innerWidth < threshold);
+  useEffect(() => {
+    const on = () => setNarrow(window.innerWidth < threshold);
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, [threshold]);
+  return narrow;
+}
+
 function ModeToggle({ mode, setMode, t, font, dir, lang }) {
+  const narrow = useIsNarrow();
   const opts = [
-    { key: "analyzer", label: t.modeAnalyzer },
-    { key: "strategy", label: t.modeStrategy },
-    { key: "tracker", label: t.modeTracker },
+    { key: "analyzer", label: t.modeAnalyzer, short: t.modeAnalyzerShort },
+    { key: "strategy", label: t.modeStrategy, short: t.modeStrategyShort },
+    { key: "tracker", label: t.modeTracker, short: t.modeTrackerShort },
     // Advanced Chart ships English-first; the Hebrew app gets it in a follow-up.
-    ...(lang === "en" ? [{ key: "chart", label: t.modeChart }] : []),
+    ...(lang === "en" ? [{ key: "chart", label: t.modeChart, short: t.modeChartShort }] : []),
   ];
   return (
     <div
@@ -80,6 +94,8 @@ function ModeToggle({ mode, setMode, t, font, dir, lang }) {
         background: C.card,
         boxShadow: `${INSET}, 0 10px 28px rgba(0,0,0,0.45)`,
         maxWidth: "calc(100vw - 24px)",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
       }}
     >
       {opts.map((o) => {
@@ -93,18 +109,19 @@ function ModeToggle({ mode, setMode, t, font, dir, lang }) {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              padding: "9px 18px",
+              padding: narrow ? "9px 12px" : "9px 18px",
               borderRadius: 40,
               border: "none",
               cursor: "pointer",
               whiteSpace: "nowrap",
-              font: `700 14px ${font}`,
+              flexShrink: 0,
+              font: `700 ${narrow ? 13 : 14}px ${font}`,
               background: on ? "#fff" : "transparent",
               color: on ? C.card : C.t50,
               transition: "all .12s",
             }}
           >
-            {o.label}
+            {(narrow && o.short) || o.label}
           </button>
         );
       })}

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useId } from "react";
 import { C } from "../shared/design.js";
 import { FONT_EN } from "../shared/design.js";
+import useChartTouch from "../shared/useChartTouch.js";
 
 // ─────────────────────────────────────────────────────────────
 // AdvancedChart — the multi-panel SVG chart for the Advanced Chart mode.
@@ -221,6 +222,13 @@ export default function AdvancedChart({ data, view, setView, W = 1200, H = 640, 
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, [N, W, plotW, setView]);
+
+  // Touch: one-finger drag pans, pinch zooms, tap moves the crosshair.
+  useChartTouch(svgRef, {
+    N, W, padL, plotW, slot, start, count, setView,
+    onGesture: () => setHover(null),
+    onTap: (cx, cy) => setHover(clientToPoint({ clientX: cx, clientY: cy })),
+  });
 
   // ── memoized heavy geometry ──
   const candleEls = useMemo(() => Array.from({ length: count }, (_, j) => {
@@ -449,7 +457,7 @@ export default function AdvancedChart({ data, view, setView, W = 1200, H = 640, 
       <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} width="100%" height="100%"
         onMouseMove={onMouseMove} onMouseDown={onMouseDown} onMouseUp={endDrag}
         onMouseLeave={() => { setHover(null); endDrag(); }}
-        style={{ display: "block", cursor: dragging ? "grabbing" : "grab", touchAction: "none" }}>
+        style={{ display: "block", cursor: dragging ? "grabbing" : "grab", touchAction: "pan-y" }}>
         <defs>
           {stack.map((p) => (
             <clipPath key={p.key} id={`clip-${p.key}-${uid}`}>

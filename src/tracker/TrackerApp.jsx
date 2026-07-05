@@ -3,6 +3,7 @@ import { C, INSET, fontFor } from "../shared/design.js";
 import { T, CHECK_TITLES } from "./strings.js";
 import { ChartCanvas } from "../strategy/StrategyApp.jsx";
 import GraphIcon from "../shared/GraphIcon.jsx";
+import useLongPress from "../shared/useLongPress.js";
 
 // ─────────────────────────────────────────────────────────────
 // TrackerApp — the Monthly Tracker (watchlist & buy alerts) tool.
@@ -140,12 +141,12 @@ function ContextMenu({ x, y, items, onClose, font }) {
   useEffect(() => {
     const close = () => onClose();
     const onKey = (e) => e.key === "Escape" && onClose();
-    window.addEventListener("mousedown", close); window.addEventListener("scroll", close, true);
+    window.addEventListener("mousedown", close); window.addEventListener("touchstart", close); window.addEventListener("scroll", close, true);
     window.addEventListener("resize", close); window.addEventListener("keydown", onKey);
-    return () => { window.removeEventListener("mousedown", close); window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); window.removeEventListener("keydown", onKey); };
+    return () => { window.removeEventListener("mousedown", close); window.removeEventListener("touchstart", close); window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); window.removeEventListener("keydown", onKey); };
   }, [onClose]);
   return (
-    <div ref={ref} onMouseDown={(e) => e.stopPropagation()} onContextMenu={(e) => e.preventDefault()}
+    <div ref={ref} onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()} onContextMenu={(e) => e.preventDefault()}
       style={{ position: "fixed", left: pos.left, top: pos.top, zIndex: 1100, minWidth: 160, background: C.card2, borderRadius: 12, padding: 6, boxShadow: `${INSET}, 0 12px 28px rgba(0,0,0,0.45)`, display: "flex", flexDirection: "column", gap: 2 }}>
       {items.map((it, i) => <ContextItem key={i} item={it} onClose={onClose} font={font} />)}
     </div>
@@ -333,14 +334,16 @@ function Sidebar({ t, font, dir, isMobile, market, setMarket, symbol, setSymbol,
 
 function StockRow({ s, t, font, dir, isMobile, selected, onClick, onRemove, onContext }) {
   const [hover, setHover] = useState(false);
+  // iOS never fires contextmenu for touches — long-press opens the same menu.
+  const longPress = useLongPress((e) => onContext && onContext(e, s));
   const showX = isMobile ? !s.loading : hover;
   let chipBg = C.card2;
   if (s.error) chipBg = C.red;
   else if (!s.loading && s.data) chipBg = VERDICT_COLOR[verdict(s.data, s.overrides).code] || C.card2;
   const sub = s.error ? t.failedShort : `${t.market[s.market]} · ${t.monthly}${s.data ? " · " + s.data.lastDate : ""}`;
   return (
-    <div onClick={onClick} onContextMenu={(e) => onContext && onContext(e, s)} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ position: "relative", display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 20, cursor: s.loading ? "default" : "pointer", transition: "background .12s", background: selected ? "rgba(255,255,255,0.06)" : hover ? "rgba(255,255,255,0.03)" : "transparent" }}>
+    <div onClick={onClick} onContextMenu={(e) => onContext && onContext(e, s)} {...longPress} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ position: "relative", display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 20, cursor: s.loading ? "default" : "pointer", transition: "background .12s", background: selected ? "rgba(255,255,255,0.06)" : hover ? "rgba(255,255,255,0.03)" : "transparent", WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none", WebkitTapHighlightColor: "transparent" }}>
       <div className={dir === "rtl" ? "ltr" : undefined} style={{ width: 80, height: 43, flexShrink: 0, borderRadius: 8, background: chipBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <span style={{ font: `700 16px ${font}`, color: "#fff" }}>{s.display}</span>
       </div>

@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { C, INSET, fontFor } from "../shared/design.js";
 import { T, CHECK_TITLES } from "./strings.js";
 import GraphIcon from "../shared/GraphIcon.jsx";
+import useChartTouch from "../shared/useChartTouch.js";
+import useLongPress from "../shared/useLongPress.js";
 
 // ─────────────────────────────────────────────────────────────
 // StrategyApp — the Sequence Method (Strategy & Tactics) tool.
@@ -223,6 +225,7 @@ function HelpTip({ children, font, dir, width = 300 }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState(null);
   const btnRef = useRef(null);
+  const shownAt = useRef(0); // touch taps fire mouseenter+click together — don't let the click instantly re-hide
   const place = () => {
     const r = btnRef.current?.getBoundingClientRect();
     if (!r) return;
@@ -233,9 +236,9 @@ function HelpTip({ children, font, dir, width = 300 }) {
     setPos({ left: Math.round(left), width: w, ...(below ? { top: Math.round(r.bottom + margin) } : { bottom: Math.round(vh - r.top + margin) }) });
   };
   return (
-    <span style={{ display: "inline-flex", flexShrink: 0 }} onMouseEnter={() => { place(); setOpen(true); }} onMouseLeave={() => setOpen(false)}>
-      <button type="button" aria-label="Help" ref={btnRef} onFocus={() => { place(); setOpen(true); }} onBlur={() => setOpen(false)}
-        onClick={() => (open ? setOpen(false) : (place(), setOpen(true)))}
+    <span style={{ display: "inline-flex", flexShrink: 0 }} onMouseEnter={() => { place(); setOpen(true); shownAt.current = Date.now(); }} onMouseLeave={() => setOpen(false)}>
+      <button type="button" aria-label="Help" ref={btnRef} onFocus={() => { place(); setOpen(true); shownAt.current = Date.now(); }} onBlur={() => setOpen(false)}
+        onClick={() => (open && Date.now() - shownAt.current > 500 ? setOpen(false) : (place(), setOpen(true), (shownAt.current = Date.now())))}
         style={{ width: 18, height: 18, borderRadius: "50%", border: "none", cursor: "help", background: C.chip, color: C.t70, font: `700 12px ${font}`, lineHeight: "18px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>?</button>
       {open && pos && (
         <span style={{ position: "fixed", left: pos.left, top: pos.top, bottom: pos.bottom, width: pos.width, zIndex: 1000, background: C.card2, color: C.t70, borderRadius: 12, padding: "12px 14px", boxShadow: `${INSET}, 0 12px 28px rgba(0,0,0,0.35)`, font: `400 12px ${font}`, lineHeight: 1.5, textAlign: dir === "rtl" ? "right" : "left", pointerEvents: "none" }}>{children}</span>
@@ -255,12 +258,12 @@ function ContextMenu({ x, y, items, onClose, font }) {
   useEffect(() => {
     const close = () => onClose();
     const onKey = (e) => e.key === "Escape" && onClose();
-    window.addEventListener("mousedown", close); window.addEventListener("scroll", close, true);
+    window.addEventListener("mousedown", close); window.addEventListener("touchstart", close); window.addEventListener("scroll", close, true);
     window.addEventListener("resize", close); window.addEventListener("keydown", onKey);
-    return () => { window.removeEventListener("mousedown", close); window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); window.removeEventListener("keydown", onKey); };
+    return () => { window.removeEventListener("mousedown", close); window.removeEventListener("touchstart", close); window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); window.removeEventListener("keydown", onKey); };
   }, [onClose]);
   return (
-    <div ref={ref} onMouseDown={(e) => e.stopPropagation()} onContextMenu={(e) => e.preventDefault()}
+    <div ref={ref} onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()} onContextMenu={(e) => e.preventDefault()}
       style={{ position: "fixed", left: pos.left, top: pos.top, zIndex: 1100, minWidth: 160, background: C.card2, borderRadius: 12, padding: 6, boxShadow: `${INSET}, 0 12px 28px rgba(0,0,0,0.45)`, display: "flex", flexDirection: "column", gap: 2 }}>
       {items.map((it, i) => <ContextItem key={i} item={it} onClose={onClose} font={font} />)}
     </div>
@@ -508,6 +511,8 @@ function Sidebar({ t, font, dir, isMobile, market, setMarket, technique, onTechn
 
 function StockRow({ s, t, font, dir, isMobile, selected, onClick, onRemove, onContext }) {
   const [hover, setHover] = useState(false);
+  // iOS never fires contextmenu for touches — long-press opens the same menu.
+  const longPress = useLongPress((e) => onContext && onContext(e, s));
   const showX = isMobile ? !s.loading : hover;
   let chipBg = C.card2;
   if (s.error) chipBg = C.red;
@@ -518,8 +523,8 @@ function StockRow({ s, t, font, dir, isMobile, selected, onClick, onRemove, onCo
   const tf = (s.data && s.data.timeframe) || "";
   const sub = s.error ? t.failedShort : `${t.market[s.market]} · ${s.data ? (t.horizon[s.data.horizon] || tf) : "…"}${s.data ? " · " + s.data.lastDate : ""}`;
   return (
-    <div onClick={onClick} onContextMenu={(e) => onContext && onContext(e, s)} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ position: "relative", display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 20, cursor: s.loading ? "default" : "pointer", transition: "background .12s", background: selected ? "rgba(255,255,255,0.06)" : hover ? "rgba(255,255,255,0.03)" : "transparent" }}>
+    <div onClick={onClick} onContextMenu={(e) => onContext && onContext(e, s)} {...longPress} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ position: "relative", display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 20, cursor: s.loading ? "default" : "pointer", transition: "background .12s", background: selected ? "rgba(255,255,255,0.06)" : hover ? "rgba(255,255,255,0.03)" : "transparent", WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none", WebkitTapHighlightColor: "transparent" }}>
       <div className={dir === "rtl" ? "ltr" : undefined} style={{ width: 80, height: 43, flexShrink: 0, borderRadius: 8, background: chipBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <span style={{ font: `700 16px ${font}`, color: "#fff" }}>{s.display}</span>
       </div>
@@ -930,6 +935,13 @@ export function ChartCanvas({ data, tier, view, setView, W, H, maxH, font }) {
     return () => el.removeEventListener("wheel", onWheel);
   }, [N, W, plotW, setView]);
 
+  // Touch: one-finger drag pans, pinch zooms, tap moves the crosshair.
+  useChartTouch(svgRef, {
+    N, W, padL, plotW, slot, start, count, setView,
+    onGesture: () => setHover(null),
+    onTap: (cx) => setHover(clientToIdx(cx)),
+  });
+
   let tip = null;
   if (hover != null && hover >= start && hover < end) {
     const k = (a) => a[hover];
@@ -954,7 +966,7 @@ export function ChartCanvas({ data, tier, view, setView, W, H, maxH, font }) {
 
   return (
     <div dir="ltr" style={{ width: "100%", aspectRatio: `${W} / ${H}`, maxHeight: maxH, background: C.sub, borderRadius: 16, overflow: "hidden" }}>
-      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} width="100%" height="100%" onMouseMove={onMouseMove} onMouseDown={onMouseDown} onMouseUp={endDrag} onMouseLeave={() => { setHover(null); endDrag(); }} style={{ display: "block", cursor: dragging ? "grabbing" : "grab", touchAction: "none" }}>
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} width="100%" height="100%" onMouseMove={onMouseMove} onMouseDown={onMouseDown} onMouseUp={endDrag} onMouseLeave={() => { setHover(null); endDrag(); }} style={{ display: "block", cursor: dragging ? "grabbing" : "grab", touchAction: "pan-y" }}>
         {grid}
         {Array.from({ length: count }, (_, j) => {
           const i = start + j;
