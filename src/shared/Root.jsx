@@ -13,21 +13,29 @@ import ChartApp from "../chart/ChartApp.jsx";
 //   • "tracker"  → the Monthly Tracker (watchlist & buy alerts) tool.
 //   • "chart"    → the Advanced Chart tool (English-first for now).
 //
-// The toggle is a floating segmented control. It is pinned (not inserted into
-// any tool's layout) specifically so the first tool stays byte-for-byte
-// untouched — Root never reaches into App.jsx. Same design system throughout.
+// The toggle is a floating segmented control, pinned (not inserted into any
+// tool's layout) so each tool owns its own layout. Root also owns the cross-
+// tool "Graph" jump: a right-click "Graph" in any scan tool preloads the stock
+// into Chart mode via `openChart`. Same design system throughout.
 // ─────────────────────────────────────────────────────────────
 export default function Root({ lang = "en", Analyzer }) {
   const [mode, setMode] = useState("analyzer");
+  const [chartTarget, setChartTarget] = useState(null); // { symbol, market } from a "Graph" click
   const t = T[lang] || T.en;
   const font = fontFor(lang);
 
+  // Chart mode ships English-first (see ModeToggle), so the Graph jump is only
+  // wired for English. A fresh object each call re-triggers ChartApp's loader.
+  const openChart = lang === "en"
+    ? (target) => { setChartTarget({ ...target }); setMode("chart"); }
+    : undefined;
+
   return (
     <>
-      {mode === "analyzer" ? <Analyzer />
-        : mode === "strategy" ? <StrategyApp lang={lang} />
-        : mode === "tracker" ? <TrackerApp lang={lang} />
-        : <ChartApp lang={lang} />}
+      {mode === "analyzer" ? <Analyzer onOpenChart={openChart} />
+        : mode === "strategy" ? <StrategyApp lang={lang} onOpenChart={openChart} />
+        : mode === "tracker" ? <TrackerApp lang={lang} onOpenChart={openChart} />
+        : <ChartApp lang={lang} initial={chartTarget} />}
       <ModeToggle mode={mode} setMode={setMode} t={t} font={font} dir={t.dir} lang={lang} />
     </>
   );

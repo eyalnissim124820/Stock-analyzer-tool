@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import GraphIcon from "./shared/GraphIcon.jsx";
 
 // ─────────────────────────────────────────────────────────────
 // Stock Analyzer — The 9-Question Method (React + Vercel)
@@ -266,7 +267,7 @@ function ContextItem({ item, onClose }) {
 }
 
 // ── root component ──────────────────────────────────────────
-export default function App() {
+export default function App({ onOpenChart }) {
   const [timeframe, setTimeframe] = useState("Weekly");
   const [market, setMarket] = useState("US");
   const [symbol, setSymbol] = useState("");
@@ -481,6 +482,7 @@ export default function App() {
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)} items={[
           { label: "Export", icon: "⬇", disabled: menu.stock.loading, onClick: () => exportStock(menu.stock) },
+          ...(onOpenChart ? [{ label: "Graph", icon: <GraphIcon />, onClick: () => onOpenChart({ symbol: menu.stock.display, market: menu.stock.market }) }] : []),
           { label: "Remove", icon: "×", danger: true, onClick: () => removeStock(menu.stock.id) },
         ]} />
       )}
