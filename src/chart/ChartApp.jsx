@@ -23,12 +23,16 @@ function useWindowWidth() {
   return w;
 }
 
-// Candle interval → the range windows that keep a chartable bar count. Daily
-// bars cover shorter windows; weekly bars need ≥1Y to clear the API's minimum-
-// bar floor. The API maps each range key to a Yahoo window and honors the
-// interval override (see api/chart.js).
-const DAILY_RANGES = ["1M", "3M", "6M", "1Y", "2Y", "5Y"];
-const WEEKLY_RANGES = ["1Y", "2Y", "5Y", "Max"];
+// Candle interval → the range windows that keep a chartable bar count. Shorter
+// bars cover shorter windows; coarser bars need a longer window to clear the
+// API's minimum-bar floor (weekly ≥1Y, monthly ≥5Y). The API maps each range
+// key to a Yahoo window and honors the interval override (see api/chart.js).
+const RANGES_FOR = {
+  "1d":  ["1M", "3M", "6M", "1Y", "2Y", "5Y"],
+  "1wk": ["1Y", "2Y", "5Y", "Max"],
+  "1mo": ["5Y", "Max"],
+};
+const DEFAULT_RANGE = { "1d": "1Y", "1wk": "1Y", "1mo": "5Y" };
 
 export default function ChartApp({ lang = "en", initial = null }) {
   const t = CT[lang] || CT.en;
@@ -92,11 +96,11 @@ export default function ChartApp({ lang = "en", initial = null }) {
 
   // Range / mode changes refetch immediately; the sensitivity slider debounces.
   function onRange(r) { setRange(r); if (state.ticker) load(state.ticker, { range: r }); }
-  // Daily/Weekly candle view. Snap to a range that has enough bars for the new
-  // interval before refetching.
+  // Daily/Weekly/Monthly candle view. Snap to a range that has enough bars for
+  // the new interval before refetching.
   function onBarInterval(iv) {
-    const ranges = iv === "1wk" ? WEEKLY_RANGES : DAILY_RANGES;
-    const nextRange = ranges.includes(range) ? range : "1Y";
+    const ranges = RANGES_FOR[iv] || RANGES_FOR["1d"];
+    const nextRange = ranges.includes(range) ? range : DEFAULT_RANGE[iv];
     setBarInterval(iv);
     if (nextRange !== range) setRange(nextRange);
     if (state.ticker) load(state.ticker, { interval: iv, range: nextRange });
@@ -148,12 +152,12 @@ export default function ChartApp({ lang = "en", initial = null }) {
           <button onClick={() => load()} style={{ ...ctlBtn, background: "#fff", color: C.card }}>{t.load}</button>
 
           <div style={{ display: "flex", gap: 2, background: C.sub, borderRadius: 40, padding: 4 }}>
-            {["1d", "1wk"].map((iv) => (
+            {["1d", "1wk", "1mo"].map((iv) => (
               <button key={iv} onClick={() => onBarInterval(iv)} style={pill(barInterval === iv)}>{t.interval[iv]}</button>
             ))}
           </div>
           <div style={{ display: "flex", gap: 2, background: C.sub, borderRadius: 40, padding: 4 }}>
-            {(barInterval === "1wk" ? WEEKLY_RANGES : DAILY_RANGES).map((r) => (
+            {(RANGES_FOR[barInterval] || RANGES_FOR["1d"]).map((r) => (
               <button key={r} onClick={() => onRange(r)} style={pill(range === r)}>{r}</button>
             ))}
           </div>
