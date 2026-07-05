@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import useChartTouch from "../shared/useChartTouch.js";
+import useLongPress from "../shared/useLongPress.js";
 
 // ─────────────────────────────────────────────────────────────
 // מנתח המניות — שיטת 9 השאלות (גרסה עברית, React + Vercel)
@@ -131,8 +133,12 @@ function HelpTip({ title, children, width = 280 }) {
     const vert = below ? { top: Math.round(r.bottom + margin) } : { bottom: Math.round(vh - r.top + margin) };
     setPos({ left: Math.round(left), width: w, ...vert });
   };
-  const show = () => { place(); setOpen(true); };
+  const shownAt = useRef(0);
+  const show = () => { place(); setOpen(true); shownAt.current = Date.now(); };
   const hide = () => setOpen(false);
+  // במגע, הקשה מפעילה mouseenter סינתטי (פתיחה) ומיד אחריו click; נותנים
+  // ל-click לסגור רק אחרי שהפתיחה "התייצבה" כדי שהכרטיס לא יהבהב וייעלם.
+  const toggle = () => (open && Date.now() - shownAt.current > 500 ? hide() : show());
 
   return (
     <span style={{ display: "inline-flex", flexShrink: 0 }}
@@ -140,7 +146,7 @@ function HelpTip({ title, children, width = 280 }) {
       <button
         type="button" aria-label={title || "עזרה"} ref={btnRef}
         onFocus={show} onBlur={hide}
-        onClick={() => (open ? hide() : show())}
+        onClick={toggle}
         style={{
           width: 18, height: 18, borderRadius: "50%", border: "none", cursor: "help",
           background: C.chip, color: C.t70, font: `700 12px ${FONT}`, lineHeight: "18px",
@@ -194,14 +200,16 @@ function Pill({ label, on, tint, mobile, onClick }) {
   return <button onClick={onClick} style={style}>{label}</button>;
 }
 
-// קישור צף למעבר חזרה לגרסה האנגלית.
+// קישור צף למעבר חזרה לגרסה האנגלית. במסכים צרים מתג המצבים הממורכז תופס את
+// רוב הרוחב — מרימים את הקישור מעליו כדי שלא יחפפו.
 function LangLink() {
   const [hover, setHover] = useState(false);
+  const narrow = useWindowWidth() < 560;
   return (
     <a href="/" title="Switch to English" dir="ltr"
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{
-        position: "fixed", bottom: "calc(14px + env(safe-area-inset-bottom))", left: "calc(16px + env(safe-area-inset-left))", zIndex: 1001, display: "flex", alignItems: "center", gap: 6,
+        position: "fixed", bottom: narrow ? "calc(68px + env(safe-area-inset-bottom))" : "calc(14px + env(safe-area-inset-bottom))", left: "calc(16px + env(safe-area-inset-left))", zIndex: 1001, display: "flex", alignItems: "center", gap: 6,
         padding: "8px 14px", borderRadius: 40, background: C.card, boxShadow: INSET,
         color: hover ? "#fff" : C.t50, font: `700 13px ${FONT}`, textDecoration: "none", transition: "color .12s",
       }}>English ›</a>
@@ -228,11 +236,13 @@ function ContextMenu({ x, y, items, onClose }) {
     const close = () => onClose();
     const onKey = (e) => e.key === "Escape" && onClose();
     window.addEventListener("mousedown", close);
+    window.addEventListener("touchstart", close); // במגע לא תמיד נוצר mousedown סינתטי
     window.addEventListener("scroll", close, true);
     window.addEventListener("resize", close);
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("mousedown", close);
+      window.removeEventListener("touchstart", close);
       window.removeEventListener("scroll", close, true);
       window.removeEventListener("resize", close);
       window.removeEventListener("keydown", onKey);
@@ -242,6 +252,7 @@ function ContextMenu({ x, y, items, onClose }) {
   return (
     <div ref={ref} dir="rtl"
       onMouseDown={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
       style={{
         position: "fixed", left: pos.left, top: pos.top, zIndex: 1100, minWidth: 180,
@@ -698,6 +709,8 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
 function StockRow({ s, timeframe, isMobile, selected, onClick, onRemove, onContext }) {
   const [hover, setHover] = useState(false);
   const [xHover, setXHover] = useState(false);
+  // ב-iOS אין אירוע contextmenu במגע — לחיצה ארוכה פותחת את אותו תפריט.
+  const longPress = useLongPress((e) => onContext && onContext(e, s));
   // במגע אין hover — שומרים על כפתור ההסרה נגיש (ומסתירים בזמן טעינה כדי שלא
   // יתנגש עם הספינר). התנהגות ה-hover בדסקטופ נשמרת ללא שינוי.
   const showX = isMobile ? !s.loading : hover;
@@ -712,11 +725,13 @@ function StockRow({ s, timeframe, isMobile, selected, onClick, onRemove, onConte
   return (
     <div onClick={onClick}
       onContextMenu={(e) => onContext && onContext(e, s)}
+      {...longPress}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => { setHover(false); setXHover(false); }}
       style={{
         position: "relative", display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 20,
         cursor: s.loading ? "default" : "pointer", transition: "background .12s",
         background: selected ? "rgba(255,255,255,0.06)" : hover ? "rgba(255,255,255,0.03)" : "transparent",
+        WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none", WebkitTapHighlightColor: "transparent",
       }}>
       <div style={{ width: 80, height: 43, flexShrink: 0, borderRadius: 8, background: chipBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <span dir="ltr" style={{ font: `700 16px ${FONT}`, color: "#fff" }}>{s.display}</span>
@@ -1180,6 +1195,13 @@ function ChartCanvas({ data, tier, view, setView, W, H, maxH }) {
     return () => el.removeEventListener("wheel", onWheel);
   }, [N, W, plotW, setView]);
 
+  // מגע: גרירה באצבע אחת מזיזה, צביטה מבצעת זום, הקשה מציבה את הצלב.
+  useChartTouch(svgRef, {
+    N, W, padL, plotW, slot, start, count, setView,
+    onGesture: () => setHover(null),
+    onTap: (cx) => setHover(clientToIdx(cx)),
+  });
+
   let tip = null;
   if (hover != null && hover >= start && hover < end) {
     const k = (a) => a[hover];
@@ -1223,7 +1245,7 @@ function ChartCanvas({ data, tier, view, setView, W, H, maxH }) {
       <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} width="100%" height="100%"
         onMouseMove={onMouseMove} onMouseDown={onMouseDown} onMouseUp={endDrag}
         onMouseLeave={() => { setHover(null); endDrag(); }}
-        style={{ display: "block", cursor: dragging ? "grabbing" : "grab", touchAction: "none", direction: "ltr" }}>
+        style={{ display: "block", cursor: dragging ? "grabbing" : "grab", touchAction: "pan-y", direction: "ltr" }}>
         {grid}
 
         {showFull && seg.highestHighIdx != null && (
@@ -1304,7 +1326,7 @@ function AnalysisChart({ data, isMobile }) {
     }}>⤢ הרחבה</button>
   );
   const hint = (
-    <span style={{ font: `400 11px ${FONT}`, color: C.t50 }}>גלילה לזום · Shift-גלילה או גרירה להזזה</span>
+    <span style={{ font: `400 11px ${FONT}`, color: C.t50 }}>גלילה או צביטה לזום · Shift-גלילה או גרירה להזזה · הקשה להצגת הצלב</span>
   );
 
   return (
