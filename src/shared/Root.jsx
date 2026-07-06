@@ -11,7 +11,7 @@ import ChartApp from "../chart/ChartApp.jsx";
 //     rendered completely unchanged).
 //   • "strategy" → the Sequence-Method (Strategy & Tactics) tool.
 //   • "tracker"  → the Monthly Tracker (watchlist & buy alerts) tool.
-//   • "chart"    → the Advanced Chart tool (English-first for now).
+//   • "chart"    → the Advanced Chart tool (English + Hebrew).
 //
 // The toggle is a floating segmented control, pinned (not inserted into any
 // tool's layout) so each tool owns its own layout. Root also owns the cross-
@@ -21,9 +21,9 @@ import ChartApp from "../chart/ChartApp.jsx";
 // ─────────────────────────────────────────────────────────────
 
 // Read a "Graph" deep-link off the URL (?tool=chart&symbol=AAPL&market=US).
-// Chart mode ships English-first, so the deep link is only honored there.
-function readChartDeepLink(lang) {
-  if (lang !== "en" || typeof window === "undefined") return null;
+// Honored in every language now that Chart mode is available in Hebrew too.
+function readChartDeepLink() {
+  if (typeof window === "undefined") return null;
   const p = new URLSearchParams(window.location.search);
   const symbol = p.get("symbol");
   if (p.get("tool") !== "chart" || !symbol) return null;
@@ -31,19 +31,17 @@ function readChartDeepLink(lang) {
 }
 
 export default function Root({ lang = "en", Analyzer }) {
-  const [deepLink] = useState(() => readChartDeepLink(lang)); // { symbol, market } | null
+  const [deepLink] = useState(() => readChartDeepLink()); // { symbol, market } | null
   const [mode, setMode] = useState(deepLink ? "chart" : "analyzer");
   const t = T[lang] || T.en;
   const font = fontFor(lang);
 
   // Right-click "Graph" opens the Chart tool in a new browser tab, deep-linked
-  // to the stock. Chart mode ships English-first, so the jump is en-only.
-  const openChart = lang === "en"
-    ? (target) => {
-        const params = new URLSearchParams({ tool: "chart", symbol: target.symbol || "", market: target.market || "US" });
-        window.open(`${window.location.pathname}?${params}`, "_blank", "noopener");
-      }
-    : undefined;
+  // to the stock. Available in every language now.
+  const openChart = (target) => {
+    const params = new URLSearchParams({ tool: "chart", symbol: target.symbol || "", market: target.market || "US" });
+    window.open(`${window.location.pathname}?${params}`, "_blank", "noopener");
+  };
 
   return (
     <>
@@ -51,7 +49,7 @@ export default function Root({ lang = "en", Analyzer }) {
         : mode === "strategy" ? <StrategyApp lang={lang} onOpenChart={openChart} />
         : mode === "tracker" ? <TrackerApp lang={lang} onOpenChart={openChart} />
         : <ChartApp lang={lang} initial={deepLink} />}
-      <ModeToggle mode={mode} setMode={setMode} t={t} font={font} dir={t.dir} lang={lang} />
+      <ModeToggle mode={mode} setMode={setMode} t={t} font={font} dir={t.dir} />
     </>
   );
 }
@@ -69,14 +67,13 @@ function useIsNarrow(threshold = 560) {
   return narrow;
 }
 
-function ModeToggle({ mode, setMode, t, font, dir, lang }) {
+function ModeToggle({ mode, setMode, t, font, dir }) {
   const narrow = useIsNarrow();
   const opts = [
     { key: "analyzer", label: t.modeAnalyzer, short: t.modeAnalyzerShort },
     { key: "strategy", label: t.modeStrategy, short: t.modeStrategyShort },
     { key: "tracker", label: t.modeTracker, short: t.modeTrackerShort },
-    // Advanced Chart ships English-first; the Hebrew app gets it in a follow-up.
-    ...(lang === "en" ? [{ key: "chart", label: t.modeChart, short: t.modeChartShort }] : []),
+    { key: "chart", label: t.modeChart, short: t.modeChartShort },
   ];
   return (
     <div
