@@ -132,9 +132,61 @@ function candleAt(c, i) {
 const isSeller = (k) => k.green && k.upper >= 2 * k.body && k.body > 0;
 const isBuyer = (k) => k.green && k.lower >= 2 * k.body && k.body > 0;
 
-// ---------- swing detection (pivot lookback) ----------
+// ---------- sequence-based extreme points (method-correct) ----------
+// Peaks (שיא) form when a RISING sequence breaks; troughs (שפל) when a
+// FALLING sequence breaks. Definition per the course (Session 02/03):
+//   • Rising sequence: each bar's close is higher than the previous bar's low.
+//     It breaks when a bar closes below the low of the highest bar in the run
+//     → that highest bar is the peak.
+//   • Falling sequence: each bar's close is lower than the previous bar's high.
+//     It breaks when a bar closes above the high of the lowest bar in the run
+//     → that lowest bar is the trough.
+// Points are confirmed only on the close of the breaking bar — no look-ahead.
+// Drives Q1, P5, Q7, and the highest-high target.
+// Returns the SAME shape as findPivots: { ph:[{i,price}], pl:[{i,price}] }.
+function findSequencePoints(open, high, low, close) {
+  const n = close.length;
+  const ph = [], pl = [];
+  if (n < 2) return { ph, pl };
+
+  // Sequence state machine. dir: +1 rising, -1 falling, 0 unset.
+  let dir = 0;
+  let extremeIdx = 0;          // index of highest bar (rising) or lowest bar (falling)
+  for (let i = 1; i < n; i++) {
+    if (dir >= 0 && close[i] > low[i - 1]) {
+      // rising continues (or starts)
+      dir = 1;
+      if (high[i] >= high[extremeIdx]) extremeIdx = i;
+      continue;
+    }
+    if (dir === 1 && close[i] < low[extremeIdx]) {
+      // RISING SEQUENCE BROKE → peak at extremeIdx
+      ph.push({ i: extremeIdx, price: high[extremeIdx] });
+      dir = -1; extremeIdx = i;                // start a falling sequence from here
+      continue;
+    }
+    if (dir <= 0 && close[i] < high[i - 1]) {
+      dir = -1;
+      if (low[i] <= low[extremeIdx]) extremeIdx = i;
+      continue;
+    }
+    if (dir === -1 && close[i] > high[extremeIdx]) {
+      // FALLING SEQUENCE BROKE → trough at extremeIdx
+      pl.push({ i: extremeIdx, price: low[extremeIdx] });
+      dir = 1; extremeIdx = i;                 // start a rising sequence from here
+      continue;
+    }
+    // otherwise: sequence continues without a new extreme; update extreme if needed
+    if (dir === 1 && high[i] >= high[extremeIdx]) extremeIdx = i;
+    if (dir === -1 && low[i] <= low[extremeIdx]) extremeIdx = i;
+  }
+  return { ph, pl };
+}
+
+// ---------- swing detection (pivot lookback) — LEGACY ----------
 // A pivot high at i: high[i] strictly greater than the `n` highs on each side.
-// Mirror for pivot lows. Drives Q1, P5, Q7, and the highest-high target.
+// Mirror for pivot lows. Retained only as a fallback for degenerate inputs;
+// the default detection path is findSequencePoints above.
 function findPivots(highs, lows, n = 2) {
   const ph = [], pl = [];
   for (let i = n; i < highs.length - n; i++) {
@@ -190,7 +242,12 @@ function analyze(candles, opts = {}) {
   const red = redLineSeries(green13, 5);
   const cci = cciSeries(c.high, c.low, c.close, 5);
   const bollLo = bollLowerSeries(c.close, 10, 1);
-  const pivots = findPivots(c.high, c.low, swingN);
+  // Method-correct points come from sequence breaks. swingN is accepted and
+  // echoed in meta for API/UI compatibility but no longer affects detection;
+  // the windowed findPivots remains only as a fallback for degenerate inputs.
+  const pivots = N < 3
+    ? findPivots(c.high, c.low, swingN)
+    : findSequencePoints(c.open, c.high, c.low, c.close);
   const seg = segments(c, pivots);
 
   const k = (i) => candleAt(c, i);
@@ -379,4 +436,4 @@ function conclude(result) {
   return { code, firstFail, preOk, aOk, bOk, cOk, allPass, ratioOk };
 }
 
-module.exports = { analyze, conclude, smaSeries, redLineSeries, cciSeries, bollLowerSeries, findPivots };
+module.exports = { analyze, conclude, smaSeries, redLineSeries, cciSeries, bollLowerSeries, findPivots, findSequencePoints };
