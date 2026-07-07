@@ -63,9 +63,6 @@ export const T = {
     symbolPlaceholder: "SYMB",
     symbolPlaceholderTLV: "TEVA · 629014 · טבע",
     analyze: "Analyze",
-    swing: "Swing sensitivity",
-    swingHelp:
-      "How many candles on each side of a bar must be lower (peak) or higher (trough) before it counts as a real swing point — on a closing basis. Higher = stricter, fewer/larger swings. Drives S1, S4, the correction/break detection and the target.",
     emptyList: "Analyze a stock to add it to your list",
     sort: {
       button: "Sorting",
@@ -140,9 +137,9 @@ export const T = {
     chartHint: "Scroll or pinch to zoom · Shift-scroll or drag to pan · Tap for crosshair",
     expand: "⤢ Expand", close: "Close",
     tiers: ["Minimal", "Core", "Full"],
-    legend: { ma5: "MA5", ma20: "MA20", ma40: "MA40", levels: "Buy / Stop / Target", pivots: "Swing pivots (close)", boll: "Bollinger (10/1)" },
+    legend: { ma5: "MA5", ma20: "MA20", ma40: "MA40", levels: "Buy / Stop / Target", pivots: "Peaks & troughs (sequence)", boll: "Bollinger (10/1)" },
     edited: "EDITED",
-    confTip: { exact: "Deterministic formula from the data", swing: "Deterministic given your swing setting — check the pivots", guess: "Best-effort interpretation — confirm visually" },
+    confTip: { exact: "Deterministic formula from the data", swing: "Deterministic from the sequence points — check the pivots", guess: "Best-effort interpretation — confirm visually" },
     notAdvice: "A faithful implementation of the Sequence Method. Not investment advice.",
   },
   he: {
@@ -170,9 +167,6 @@ export const T = {
     symbolPlaceholder: "סמל",
     symbolPlaceholderTLV: "סמל · מס' נייר · שם",
     analyze: "נתח",
-    swing: "רגישות תנודה",
-    swingHelp:
-      "כמה נרות בכל צד של נר חייבים להיות נמוכים יותר (פסגה) או גבוהים יותר (שפל) כדי שייחשב נקודת מפנה — על בסיס סגירה. גבוה יותר = מחמיר יותר, פחות תנודות וגדולות יותר. משפיע על S1, S4, זיהוי התיקון/השבירה והיעד.",
     emptyList: "נתחו מנייה כדי להוסיף אותה לרשימה",
     sort: {
       button: "מיון",
@@ -247,9 +241,9 @@ export const T = {
     chartHint: "גלילה או צביטה לזום · Shift-גלילה או גרירה להזזה · הקשה להצגת הצלב",
     expand: "⤢ הגדלה", close: "סגירה",
     tiers: ["מינימלי", "ליבה", "מלא"],
-    legend: { ma5: "MA5", ma20: "MA20", ma40: "MA40", levels: "קנייה / סטופ / יעד", pivots: "נקודות תנודה (סגירה)", boll: "Bollinger (10/1)" },
+    legend: { ma5: "MA5", ma20: "MA20", ma40: "MA40", levels: "קנייה / סטופ / יעד", pivots: "פסגות ושפלים (רצפים)", boll: "Bollinger (10/1)" },
     edited: "נערך",
-    confTip: { exact: "נוסחה דטרמיניסטית מהנתונים", swing: "דטרמיניסטי לפי הגדרת התנודה — בדקו את הנקודות", guess: "פרשנות מיטבית — ודאו ויזואלית" },
+    confTip: { exact: "נוסחה דטרמיניסטית מהנתונים", swing: "דטרמיניסטי לפי נקודות הרצף — בדקו את הנקודות", guess: "פרשנות מיטבית — ודאו ויזואלית" },
     notAdvice: "מימוש נאמן של שיטת הרצפים. אינו ייעוץ השקעות.",
   },
 };

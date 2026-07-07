@@ -220,33 +220,6 @@ function Pill({ label, on, tint, mobile, onClick, font }) {
   return <button onClick={onClick} style={on ? { ...base, background: tint, color: "#fff" } : { ...base, background: C.chip, color: C.t40 }}>{label}</button>;
 }
 
-// "?" affordance with a styled explanation card (hover/focus), clamped to the viewport.
-function HelpTip({ children, font, dir, width = 300 }) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState(null);
-  const btnRef = useRef(null);
-  const shownAt = useRef(0); // touch taps fire mouseenter+click together — don't let the click instantly re-hide
-  const place = () => {
-    const r = btnRef.current?.getBoundingClientRect();
-    if (!r) return;
-    const margin = 8, estH = 230, vw = window.innerWidth, vh = window.innerHeight;
-    const w = Math.min(width, vw - 2 * margin);
-    let left = Math.max(margin, Math.min(r.left + r.width / 2 - w / 2, vw - w - margin));
-    const below = r.top < estH + 2 * margin;
-    setPos({ left: Math.round(left), width: w, ...(below ? { top: Math.round(r.bottom + margin) } : { bottom: Math.round(vh - r.top + margin) }) });
-  };
-  return (
-    <span style={{ display: "inline-flex", flexShrink: 0 }} onMouseEnter={() => { place(); setOpen(true); shownAt.current = Date.now(); }} onMouseLeave={() => setOpen(false)}>
-      <button type="button" aria-label="Help" ref={btnRef} onFocus={() => { place(); setOpen(true); shownAt.current = Date.now(); }} onBlur={() => setOpen(false)}
-        onClick={() => (open && Date.now() - shownAt.current > 500 ? setOpen(false) : (place(), setOpen(true), (shownAt.current = Date.now())))}
-        style={{ width: 18, height: 18, borderRadius: "50%", border: "none", cursor: "help", background: C.chip, color: C.t70, font: `700 12px ${font}`, lineHeight: "18px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>?</button>
-      {open && pos && (
-        <span style={{ position: "fixed", left: pos.left, top: pos.top, bottom: pos.bottom, width: pos.width, zIndex: 1000, background: C.card2, color: C.t70, borderRadius: 12, padding: "12px 14px", boxShadow: `${INSET}, 0 12px 28px rgba(0,0,0,0.35)`, font: `400 12px ${font}`, lineHeight: 1.5, textAlign: dir === "rtl" ? "right" : "left", pointerEvents: "none" }}>{children}</span>
-      )}
-    </span>
-  );
-}
-
 function ContextMenu({ x, y, items, onClose, font }) {
   const ref = useRef(null);
   const [pos, setPos] = useState({ left: x, top: y });
@@ -311,17 +284,15 @@ export default function StrategyApp({ lang = "en", onOpenChart }) {
   const [technique, setTechnique] = useState(1);
   const [timeframe, setTimeframe] = useState("Weekly");
   const [symbol, setSymbol] = useState("");
-  const [swingN, setSwingN] = useState(2);
   const [stocks, setStocks] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [mobileDetail, setMobileDetail] = useState(false);
   const [menu, setMenu] = useState(null);
   const [batch, setBatch] = useState(null); // { rows, fileName } while the confirm popup is open
   const nextId = useRef(1);
-  const swingTimer = useRef(null);
   const fileRef = useRef(null);
 
-  async function fetchStock({ rawSymbol, market: mkt, tech, tf, n, existingId }) {
+  async function fetchStock({ rawSymbol, market: mkt, tech, tf, existingId }) {
     const display = cleanSymbol(rawSymbol);
     if (!display) return;
     const ticker = resolveTicker(rawSymbol, mkt);
@@ -334,7 +305,7 @@ export default function StrategyApp({ lang = "en", onOpenChart }) {
     });
     setSelectedId(id);
     try {
-      const url = `/api/strategy?ticker=${encodeURIComponent(ticker)}&market=${encodeURIComponent(mkt)}&technique=${tech}&timeframe=${encodeURIComponent(tf)}&swingN=${n}&lang=${lang}`;
+      const url = `/api/strategy?ticker=${encodeURIComponent(ticker)}&market=${encodeURIComponent(mkt)}&technique=${tech}&timeframe=${encodeURIComponent(tf)}&lang=${lang}`;
       const r = await fetch(url);
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Request failed");
@@ -348,7 +319,7 @@ export default function StrategyApp({ lang = "en", onOpenChart }) {
 
   function analyze() {
     if (!symbol.trim()) return;
-    fetchStock({ rawSymbol: symbol, market, tech: technique, tf: timeframe, n: swingN });
+    fetchStock({ rawSymbol: symbol, market, tech: technique, tf: timeframe });
     setSymbol("");
     if (isMobile) setMobileDetail(true);
   }
@@ -358,15 +329,10 @@ export default function StrategyApp({ lang = "en", onOpenChart }) {
   // Re-run the selected scan when a parameter changes so the detail reflects it.
   function reRun(patch) {
     if (selected && !selected.loading && selected.data)
-      fetchStock({ rawSymbol: selected.display, market: selected.market, tech: patch.tech ?? technique, tf: patch.tf ?? timeframe, n: patch.n ?? swingN, existingId: selected.id });
+      fetchStock({ rawSymbol: selected.display, market: selected.market, tech: patch.tech ?? technique, tf: patch.tf ?? timeframe, existingId: selected.id });
   }
   function onTechnique(tech) { setTechnique(tech); reRun({ tech }); }
   function onTimeframe(tf) { setTimeframe(tf); if (technique === 2) reRun({ tf }); }
-  function onSwing(n) {
-    setSwingN(n);
-    if (swingTimer.current) clearTimeout(swingTimer.current);
-    if (selected && !selected.loading && selected.data) swingTimer.current = setTimeout(() => reRun({ n }), 450);
-  }
 
   const setOverride = (stockId, checkId, value) =>
     setStocks((prev) => prev.map((s) => s.id === stockId ? { ...s, overrides: { ...s.overrides, [checkId]: value } } : s));
@@ -412,7 +378,7 @@ export default function StrategyApp({ lang = "en", onOpenChart }) {
     const wave = ids.slice(startIdx, startIdx + 5);
     const results = await Promise.all(wave.map((x) => {
       const r = x.row;
-      const url = `/api/strategy?ticker=${encodeURIComponent(x.ticker)}&market=${encodeURIComponent(x.market)}&technique=${r.technique}&timeframe=${encodeURIComponent(r.tf)}&swingN=${swingN}&lang=${lang}`;
+      const url = `/api/strategy?ticker=${encodeURIComponent(x.ticker)}&market=${encodeURIComponent(x.market)}&technique=${r.technique}&timeframe=${encodeURIComponent(r.tf)}&lang=${lang}`;
       return fetch(url).then((res) => res.json())
         .then((j) => (!j.error ? { id: x.id, data: j } : { id: x.id, error: j.error || "Failed" }))
         .catch((e) => ({ id: x.id, error: e.message }));
@@ -428,7 +394,7 @@ export default function StrategyApp({ lang = "en", onOpenChart }) {
   return (
     <div dir={dir} style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: isMobile ? "100dvh" : "100vh", width: "100%", background: C.bg, fontFamily: font, color: C.text, overflow: "hidden", ...(isMobile ? { paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" } : null) }}>
       {(!isMobile || !mobileDetail) && (
-        <Sidebar {...{ t, font, dir, isMobile, market, setMarket, technique, onTechnique, timeframe, onTimeframe, symbol, setSymbol, analyze, swingN, onSwing, stocks, selectedId, setSelectedId: selectStock, removeStock, onBatch: openBatch, onDownloadDemo: downloadDemoFile, onContext: (e, s) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY, stock: s }); } }} />
+        <Sidebar {...{ t, font, dir, isMobile, market, setMarket, technique, onTechnique, timeframe, onTimeframe, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId: selectStock, removeStock, onBatch: openBatch, onDownloadDemo: downloadDemoFile, onContext: (e, s) => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY, stock: s }); } }} />
       )}
       {(!isMobile || mobileDetail) && (
         <Main {...{ t, font, dir, isMobile, onBack: () => setMobileDetail(false), stock: selected, setOverride, refresh: () => selected && reRun({}) }} />
@@ -446,7 +412,7 @@ export default function StrategyApp({ lang = "en", onOpenChart }) {
 }
 
 // ── Sidebar ──
-function Sidebar({ t, font, dir, isMobile, market, setMarket, technique, onTechnique, timeframe, onTimeframe, symbol, setSymbol, analyze, swingN, onSwing, stocks, selectedId, setSelectedId, removeStock, onBatch, onDownloadDemo, onContext }) {
+function Sidebar({ t, font, dir, isMobile, market, setMarket, technique, onTechnique, timeframe, onTimeframe, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId, removeStock, onBatch, onDownloadDemo, onContext }) {
   const [focus, setFocus] = useState(false);
   const [batchHover, setBatchHover] = useState(false);
   const [demoHover, setDemoHover] = useState(false);
@@ -469,16 +435,6 @@ function Sidebar({ t, font, dir, isMobile, market, setMarket, technique, onTechn
           className={dir === "rtl" ? "ltr" : undefined}
           style={{ flex: 1, minWidth: isMobile ? 0 : 110, height: ctlH, padding: "0 20px", borderRadius: 16, background: focus ? "rgba(0,0,0,0.30)" : "rgba(0,0,0,0.18)", color: "#fff", font: `700 18px ${font}`, border: "none", outline: "none", textAlign: "center", letterSpacing: "0.04em", boxShadow: focus ? "inset 0 0 0 2px #fff" : "none", ...mobileFull }} />
         <button onClick={analyze} style={{ ...ctlBtn, ...mobileFull, background: "#fff", color: C.card }}>{t.analyze}</button>
-      </div>
-
-      {/* Swing sensitivity */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16, background: C.card, borderRadius: 24, boxShadow: INSET, padding: "14px 20px", flexShrink: 0 }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          <span style={{ font: `700 14px ${font}`, color: C.t70, whiteSpace: "nowrap" }}>{t.swing}</span>
-          <HelpTip font={font} dir={dir}>{t.swingHelp}</HelpTip>
-        </span>
-        <input type="range" min={1} max={5} value={swingN} onChange={(e) => onSwing(+e.target.value)} style={{ flex: 1, minWidth: 0, accentColor: C.green }} />
-        <span style={{ font: `700 16px ${font}`, color: "#fff", minWidth: 16, textAlign: "center" }}>{swingN}</span>
       </div>
 
       {/* Batch analysis + demo + sorting (shown once there are results) */}

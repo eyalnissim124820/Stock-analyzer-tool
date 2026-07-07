@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
 // /api/strategy — Vercel serverless function for the Sequence Method tool.
-// GET /api/strategy?ticker=AAPL&market=US&technique=1&timeframe=Weekly&swingN=2&lang=en
+// GET /api/strategy?ticker=AAPL&market=US&technique=1&timeframe=Weekly&lang=en
 //
 // Technique 1 (cascade): fetches Monthly + Weekly + Daily so the cascade can
 // pick the trade horizon. Technique 2 (single timeframe): fetches just the one.
@@ -26,7 +26,6 @@ module.exports = async (req, res) => {
     const market = q.market === "TLV" ? "TLV" : "US";
     const technique = String(q.technique) === "2" ? 2 : 1;
     const timeframe = ["Daily", "Weekly", "Monthly"].includes(q.timeframe) ? q.timeframe : "Weekly";
-    const swingN = Math.max(1, Math.min(5, parseInt(q.swingN) || 2));
     const lang = q.lang === "he" ? "he" : "en";
     // Israeli addition: TASE security numbers / Hebrew or free-text names
     // resolve to the ".TA" Yahoo symbol; returns null for every input the
@@ -71,7 +70,6 @@ module.exports = async (req, res) => {
       candlesByTf,
       timeframe,
       technique,
-      swingN,
       market,
       lang,
       currency: meta.currency,
@@ -89,7 +87,6 @@ module.exports = async (req, res) => {
       exchange: meta.exchange,
       currency: meta.currency,
       lastDate: meta.lastDate,
-      swingN,
       technique,
       timeframe: tradeTf,         // the timeframe the trade analysis used
       requestedTimeframe: timeframe,
