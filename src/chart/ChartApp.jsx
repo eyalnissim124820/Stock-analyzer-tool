@@ -24,11 +24,14 @@ function useWindowWidth() {
 }
 
 // Candle interval → the range windows that keep a chartable bar count. Daily
-// bars cover shorter windows; weekly bars need ≥1Y to clear the API's minimum-
-// bar floor. The API maps each range key to a Yahoo window and honors the
-// interval override (see api/chart.js).
+// bars cover shorter windows; weekly bars need ≥1Y and monthly bars need ≥5Y
+// to clear the API's minimum-bar floor. The API maps each range key to a
+// Yahoo window and honors the interval override (see api/chart.js).
 const DAILY_RANGES = ["1M", "3M", "6M", "1Y", "2Y", "5Y"];
 const WEEKLY_RANGES = ["1Y", "2Y", "5Y", "Max"];
+const MONTHLY_RANGES = ["5Y", "10Y", "Max"];
+const DEFAULT_RANGE = { "1d": "1Y", "1wk": "1Y", "1mo": "5Y" };
+function rangesFor(iv) { return iv === "1wk" ? WEEKLY_RANGES : iv === "1mo" ? MONTHLY_RANGES : DAILY_RANGES; }
 
 export default function ChartApp({ lang = "en", initial = null }) {
   const t = CT[lang] || CT.en;
@@ -37,7 +40,7 @@ export default function ChartApp({ lang = "en", initial = null }) {
 
   const [market, setMarket] = useState("US");
   const [symbol, setSymbol] = useState("");
-  const [barInterval, setBarInterval] = useState("1d"); // "1d" (daily) | "1wk" (weekly)
+  const [barInterval, setBarInterval] = useState("1d"); // "1d" (daily) | "1wk" (weekly) | "1mo" (monthly)
   const [range, setRange] = useState("1Y");
   const [zigzagMode, setZigzagMode] = useState("sequence");
   const [sensitivity, setSensitivity] = useState(5);
@@ -95,8 +98,8 @@ export default function ChartApp({ lang = "en", initial = null }) {
   // Daily/Weekly candle view. Snap to a range that has enough bars for the new
   // interval before refetching.
   function onBarInterval(iv) {
-    const ranges = iv === "1wk" ? WEEKLY_RANGES : DAILY_RANGES;
-    const nextRange = ranges.includes(range) ? range : "1Y";
+    const ranges = rangesFor(iv);
+    const nextRange = ranges.includes(range) ? range : DEFAULT_RANGE[iv];
     setBarInterval(iv);
     if (nextRange !== range) setRange(nextRange);
     if (state.ticker) load(state.ticker, { interval: iv, range: nextRange });
@@ -148,12 +151,12 @@ export default function ChartApp({ lang = "en", initial = null }) {
           <button onClick={() => load()} style={{ ...ctlBtn, background: "#fff", color: C.card }}>{t.load}</button>
 
           <div style={{ display: "flex", gap: 2, background: C.sub, borderRadius: 40, padding: 4 }}>
-            {["1d", "1wk"].map((iv) => (
+            {["1d", "1wk", "1mo"].map((iv) => (
               <button key={iv} onClick={() => onBarInterval(iv)} style={pill(barInterval === iv)}>{t.interval[iv]}</button>
             ))}
           </div>
           <div style={{ display: "flex", gap: 2, background: C.sub, borderRadius: 40, padding: 4 }}>
-            {(barInterval === "1wk" ? WEEKLY_RANGES : DAILY_RANGES).map((r) => (
+            {rangesFor(barInterval).map((r) => (
               <button key={r} onClick={() => onRange(r)} style={pill(range === r)}>{r}</button>
             ))}
           </div>

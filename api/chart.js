@@ -16,7 +16,9 @@ const { smaSeries, emaSeries, rsiSeries, macdSeries, bollingerSeries } = require
 
 // UI range → Yahoo interval/range. Weekly beyond 1Y, monthly for Max, so the
 // bar count stays chartable. 1M relaxes the min-bar floor (a fresh listing
-// still draws).
+// still draws). "10Y" exists only for the monthly candle view (the frontend
+// never offers it under daily/weekly) — its default interval is "1mo" so the
+// generic minBars floor stays honest even without a client interval override.
 const RANGES = {
   "1M":  { interval: "1d",  range: "1mo",  minBars: 15 },
   "3M":  { interval: "1d",  range: "3mo",  minBars: 30 },
@@ -24,6 +26,7 @@ const RANGES = {
   "1Y":  { interval: "1d",  range: "1y",   minBars: 30 },
   "2Y":  { interval: "1wk", range: "2y",   minBars: 30 },
   "5Y":  { interval: "1wk", range: "5y",   minBars: 30 },
+  "10Y": { interval: "1mo", range: "10y",  minBars: 12 },
   "Max": { interval: "1mo", range: "max",  minBars: 12 },
 };
 const INTERVALS = ["1d", "1wk", "1mo"];
