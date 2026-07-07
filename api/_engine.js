@@ -314,9 +314,18 @@ function analyze(candles, opts = {}) {
       M.Q2(Math.round(rv).toLocaleString(), Math.round(cv).toLocaleString()));
   } else put("Q2", null, "swing", M.Q2null());
 
-  // Q3 — green line sloping up AND red below green (at last bar)
-  const greenUp = green13[last] != null && green13[last - 1] != null && green13[last] > green13[last - 1];
-  const redBelow = red[last] != null && green13[last] != null && red[last] < green13[last];
+  // Q3 — TREND confirmation, measured over the RISING sequence (at the highest
+  // high), NOT at `last`. By the method's design `last` sits at the bottom of
+  // the pullback, so the green line is falling and the red 5-SMA has crossed
+  // above it there — measuring the trend at `last` is self-defeating and
+  // contradicts Q5 (which needs the red line falling at `last`). We ask
+  // "was the trend up when the rise topped?": green line (13 SMA) rising into
+  // the high AND red line (5 SMA) below green there.
+  let q3Idx = seg.highestHighIdx != null ? seg.highestHighIdx : last;
+  // Ensure a valid prior bar with non-null MA values at the reference point.
+  while (q3Idx > 1 && (green13[q3Idx] == null || green13[q3Idx - 1] == null || red[q3Idx] == null)) q3Idx--;
+  const greenUp = green13[q3Idx] != null && green13[q3Idx - 1] != null && green13[q3Idx] > green13[q3Idx - 1];
+  const redBelow = red[q3Idx] != null && green13[q3Idx] != null && red[q3Idx] < green13[q3Idx];
   put("Q3", greenUp && redBelow ? "yes" : "no", "exact",
     M.Q3(greenUp, redBelow));
 
@@ -341,12 +350,18 @@ function analyze(candles, opts = {}) {
   put("Q6", cciHit ? "yes" : "no", "exact",
     M.Q6(isFinite(cciMin) ? cciMin.toFixed(0) : null));
 
-  // Q7 — ≥1 correction candle entirely below the prior sequence low (incl. tail)
-  if (seg.priorSeqLow != null && seg.highestHighIdx != null) {
+  // Q7 — ≥1 correction candle entirely below the low of the HIGHEST candle in
+  // the prior rising sequence (doc C3). Anchoring to the PEAK candle's low — a
+  // local reference at the top of the pullback — confirms a real falling
+  // sequence formed (a lower low), WITHOUT demanding the whole rise be
+  // retraced. The old anchor (seg.priorSeqLow, the base the rise launched from)
+  // required a full retracement, so it failed exactly when the setup was good.
+  if (seg.highestHighIdx != null) {
+    const anchorLow = c.low[seg.highestHighIdx];
     let undercut = false;
-    for (let i = seg.highestHighIdx + 1; i <= last; i++) if (c.high[i] < seg.priorSeqLow) { undercut = true; break; }
+    for (let i = seg.highestHighIdx + 1; i <= last; i++) if (c.high[i] < anchorLow) { undercut = true; break; }
     put("Q7", undercut ? "yes" : "no", "swing",
-      M.Q7(seg.priorSeqLow.toFixed(2), undercut));
+      M.Q7(anchorLow.toFixed(2), undercut));
   } else put("Q7", null, "swing", M.Q7null());
 
   // ===== PHASE C ===== (only one Yes needed)
@@ -403,8 +418,13 @@ function q4Guess(c, pivots) {
   const tol = level * 0.02;
   let brokeAbove = false, heldAsSupport = false;
   for (let i = 0; i <= last; i++) {
+    // Closing-basis break (doc S4: measured on close, not highs).
     if (c.close[i] > level + tol) brokeAbove = true;
-    if (brokeAbove && c.low[i] <= level + tol && c.low[i] >= level - tol && c.close[i] > level) heldAsSupport = true;
+    // Held as support: after the break, price revisited the level (low reached
+    // near/into it) yet CLOSED back above it → the old ceiling acts as a floor.
+    // Relaxed from the previous "close strictly above level" to "close ≥ level −
+    // tol" so a clean hold at the level still counts.
+    if (brokeAbove && c.low[i] <= level + tol && c.close[i] >= level - tol) heldAsSupport = true;
   }
   return brokeAbove && heldAsSupport ? "yes" : "no";
 }
@@ -413,12 +433,18 @@ function q4Guess(c, pivots) {
 function conclude(result) {
   const v = (id) => result.checks[id]?.value;
   const PRE = ["P1", "P2", "P3", "P4", "P5"];
-  const A = ["Q1", "Q2", "Q3", "Q4"], B = ["Q5", "Q6", "Q7"], C = ["Q8", "Q9"];
+  // Q4 (broken-resistance-became-support) is a GUESS-tier heuristic that the
+  // README itself flags as needing visual confirmation. It is deliberately NOT
+  // in the deterministic Phase-A gate below — a best-effort guess must not
+  // hard-fail an otherwise-valid automated verdict. It is still computed and
+  // surfaced (as `q4Advisory`) so the UI can prompt "confirm visually".
+  const A = ["Q1", "Q2", "Q3"], B = ["Q5", "Q6", "Q7"], C = ["Q8", "Q9"];
   const anyNull = [...PRE, ...A, ...B, ...C].some((id) => v(id) == null);
   const preOk = PRE.every((id) => v(id) === "yes" || v(id) === "na");
   const aOk = A.every((id) => v(id) === "yes");
   const bOk = B.every((id) => v(id) === "yes");
   const cOk = C.some((id) => v(id) === "yes");
+  const q4Advisory = v("Q4"); // "yes" | "no" — advisory only, never gates the verdict
   const allPass = preOk && aOk && bOk && cOk;
   const ratio = result.math.ratio;
   const ratioOk = ratio != null && ratio >= 1.5;
@@ -433,7 +459,7 @@ function conclude(result) {
   else if (allPass && !ratioOk) code = "BUY_LIMIT";
   else code = "DO_NOT_ENTER";
 
-  return { code, firstFail, preOk, aOk, bOk, cOk, allPass, ratioOk };
+  return { code, firstFail, preOk, aOk, bOk, cOk, q4Advisory, allPass, ratioOk };
 }
 
 module.exports = { analyze, conclude, smaSeries, redLineSeries, cciSeries, bollLowerSeries, findPivots, findSequencePoints };

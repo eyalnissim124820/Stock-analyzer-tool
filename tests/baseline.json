@@ -75,9 +75,9 @@
      "why": "Min CCI(5) in correction ≈ -167 (need < −100)"
     },
     "Q7": {
-     "value": "no",
+     "value": "yes",
      "conf": "swing",
-     "why": "Prior sequence low 177.74; no full undercut"
+     "why": "Prior sequence low 195.06; a candle closed entirely below it"
     },
     "Q8": {
      "value": "yes",
@@ -109,6 +109,7 @@
     "aOk": false,
     "bOk": false,
     "cOk": true,
+    "q4Advisory": "yes",
     "allPass": false,
     "ratioOk": false
    },
@@ -1730,9 +1731,9 @@
      "why": "Min CCI(5) in correction ≈ -167 (need < −100)"
     },
     "Q7": {
-     "value": "no",
+     "value": "yes",
      "conf": "swing",
-     "why": "Prior sequence low 173.23; no full undercut"
+     "why": "Prior sequence low 186.40; a candle closed entirely below it"
     },
     "Q8": {
      "value": "yes",
@@ -1764,6 +1765,7 @@
     "aOk": false,
     "bOk": false,
     "cOk": true,
+    "q4Advisory": "yes",
     "allPass": false,
     "ratioOk": false
    },
@@ -3416,9 +3418,9 @@
      "why": "CCI(5) מינימלי בתיקון ≈ -145 (נדרש < ‎−100)"
     },
     "Q7": {
-     "value": "no",
+     "value": "yes",
      "conf": "swing",
-     "why": "שפל הרצף הקודם 58.07; אין חדירה מלאה מתחתיו"
+     "why": "שפל הרצף הקודם 74.29; נר ירד כולו מתחתיו"
     },
     "Q8": {
      "value": "yes",
@@ -3450,6 +3452,7 @@
     "aOk": false,
     "bOk": false,
     "cOk": true,
+    "q4Advisory": "yes",
     "allPass": false,
     "ratioOk": false
    },
@@ -5103,7 +5106,7 @@
     "Q7": {
      "value": "no",
      "conf": "swing",
-     "why": "Prior sequence low 125.62; no full undercut"
+     "why": "Prior sequence low 144.77; no full undercut"
     },
     "Q8": {
      "value": "yes",
@@ -5135,6 +5138,7 @@
     "aOk": true,
     "bOk": false,
     "cOk": true,
+    "q4Advisory": "yes",
     "allPass": false,
     "ratioOk": false
    },
