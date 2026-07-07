@@ -120,6 +120,32 @@ const alternates = (pts) => pts.every((p, i) => i === 0 || p.kind !== pts[i - 1]
     assert.strictEqual(trendVerdict(a.points).trend, "uptrend");
   });
 
+  await test("sequence mode confirms a break the previous-bar gate used to miss", () => {
+    // Regression for the drift between zigzagSequence and _engine.sequenceStructure.
+    // Rising run peaks at bar 2 (high 13.0, low 12.0). Bar 3 pulls back, printing a
+    // lower LOW (11.0) but closing (12.2) above the peak's low — sequence intact.
+    // Bar 4 closes 11.5: BELOW the peak candle's low (12.0) → the rising sequence
+    // breaks and bar 2 is a confirmed swing high. The old detector gated the break
+    // on the PREVIOUS bar's low (close 11.5 > low[3] 11.0), so it stayed "rising"
+    // and never confirmed the peak. Wicks matter here (high ≠ low), which is why the
+    // flat-candle tests above never caught this.
+    const c = {
+      open:  [10,   11,   12,   12.0, 11.0],
+      high:  [10.5, 11.5, 13.0, 12.5, 11.8],
+      low:   [9.5,  10.5, 12.0, 11.0, 10.5],
+      close: [10,   11,   12.8, 12.2, 11.5],
+      volume: Array(5).fill(1e6),
+    };
+    const pts = zigzagSequence(c);
+    const confirmed = pts.filter((p) => !p.provisional);
+    assert.strictEqual(confirmed.length, 1, `expected the peak to confirm, got ${kinds(confirmed)}`);
+    assert.deepStrictEqual(confirmed[0], { i: 2, price: 13.0, kind: "H" });
+    const last = pts[pts.length - 1];
+    assert.strictEqual(last.kind, "L");
+    assert.strictEqual(last.provisional, true);
+    assert.ok(alternates(pts), `must alternate, got ${kinds(pts)}`);
+  });
+
   // ── sensitivity monotonicity ──
   await test("higher percent threshold never yields more swing points", () => {
     const fx = yahooChartFixture("TEST", "1d", 200).chart.result[0];

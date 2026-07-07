@@ -17426,6 +17426,12 @@
     },
     "points": [
      {
+      "i": 2,
+      "price": 195.44,
+      "kind": "L",
+      "label": "L"
+     },
+     {
       "i": 28,
       "price": 213.13,
       "kind": "H",
@@ -17435,7 +17441,7 @@
       "i": 58,
       "price": 201.55,
       "kind": "L",
-      "label": "L"
+      "label": "HL"
      },
      {
       "i": 76,
@@ -17459,13 +17465,22 @@
     ],
     "trend": {
      "trend": "uptrend",
-     "confidence": 0.67,
+     "confidence": 0.75,
      "reasons": [
-      "Last 3 swings: HH → LL → HH",
+      "Last 4 swings: HL → HH → LL → HH",
       "Rising highs and rising lows — buyers in control."
      ]
     },
-    "srLevels": [],
+    "srLevels": [
+     {
+      "price": 195.56,
+      "touches": 2,
+      "kind": "support",
+      "strength": 3,
+      "firstIdx": 2,
+      "lastIdx": 111
+     }
+    ],
     "fib": {
      "from": {
       "i": 76,
