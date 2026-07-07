@@ -111,84 +111,6 @@ function Badge({ conf }) {
   );
 }
 
-// Small "?" affordance that reveals a styled explanation card on hover/focus.
-// Native title tooltips can't carry the multi-line explanation + examples we want.
-// Positioned with fixed coords computed from the trigger so it never clips the
-// window edges: it flips below the icon when there isn't room above, and clamps
-// horizontally into the viewport.
-function HelpTip({ title, children, width = 280 }) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState(null);
-  const btnRef = useRef(null);
-
-  const place = () => {
-    const r = btnRef.current?.getBoundingClientRect();
-    if (!r) return;
-    const margin = 8, estH = 230;
-    const vw = window.innerWidth, vh = window.innerHeight;
-    const w = Math.min(width, vw - 2 * margin);
-    let left = r.left + r.width / 2 - w / 2;
-    left = Math.max(margin, Math.min(left, vw - w - margin));
-    // Prefer above; drop below the icon when the card wouldn't fit above the window.
-    const below = r.top < estH + 2 * margin;
-    const vert = below ? { top: Math.round(r.bottom + margin) } : { bottom: Math.round(vh - r.top + margin) };
-    setPos({ left: Math.round(left), width: w, ...vert });
-  };
-  const shownAt = useRef(0);
-  const show = () => { place(); setOpen(true); shownAt.current = Date.now(); };
-  const hide = () => setOpen(false);
-  // On touch, a tap fires synthetic mouseenter (show) then click right after;
-  // only let the click toggle the card closed once the open state has settled.
-  const toggle = () => (open && Date.now() - shownAt.current > 500 ? hide() : show());
-
-  return (
-    <span style={{ display: "inline-flex", flexShrink: 0 }}
-      onMouseEnter={show} onMouseLeave={hide}>
-      <button
-        type="button" aria-label={title || "Help"} ref={btnRef}
-        onFocus={show} onBlur={hide}
-        onClick={toggle}
-        style={{
-          width: 18, height: 18, borderRadius: "50%", border: "none", cursor: "help",
-          background: C.chip, color: C.t70, font: `700 12px ${FONT}`, lineHeight: "18px",
-          padding: 0, display: "flex", alignItems: "center", justifyContent: "center",
-        }}>?</button>
-      {open && pos && (
-        <span style={{
-          position: "fixed", left: pos.left, top: pos.top, bottom: pos.bottom, width: pos.width,
-          zIndex: 1000, background: C.card2, color: C.t70,
-          borderRadius: 12, padding: "12px 14px", boxShadow: `${INSET}, 0 12px 28px rgba(0,0,0,0.35)`,
-          font: `400 12px ${FONT}`, lineHeight: 1.5, textAlign: "left", pointerEvents: "none",
-        }}>
-          {title && <span style={{ display: "block", font: `700 13px ${FONT}`, color: "#fff", marginBottom: 6 }}>{title}</span>}
-          {children}
-        </span>
-      )}
-    </span>
-  );
-}
-
-// Reusable copy for the swing-sensitivity explainer (used by the sidebar HelpTip).
-function SwingHelp() {
-  return (
-    <>
-      Controls how many candles on each side of a bar must be lower (for a peak) or higher
-      (for a trough) before it counts as a real swing point.
-      <span style={{ display: "block", marginTop: 8, color: C.t50 }}>
-        <strong style={{ color: C.green, fontWeight: 700 }}>1</strong> — very sensitive: marks
-        many small swings (noisier).<br />
-        <strong style={{ color: C.green, fontWeight: 700 }}>5</strong> — strict: only major
-        turning points.<br />
-        <strong style={{ color: "#fff", fontWeight: 700 }}>2</strong> is the default.
-      </span>
-      <span style={{ display: "block", marginTop: 8 }}>
-        These pivots drive Q1, P5, Q7 and the highest-high target (and therefore Reward %).
-        If the detected swings don't match what your eye sees, nudge this.
-      </span>
-    </>
-  );
-}
-
 function Pill({ label, on, tint, mobile, onClick }) {
   const base = {
     display: "flex", alignItems: "center", justifyContent: "center", padding: "8px 16px",
@@ -280,12 +202,10 @@ export default function App({ onOpenChart }) {
   const [timeframe, setTimeframe] = useState("Weekly");
   const [market, setMarket] = useState("US");
   const [symbol, setSymbol] = useState("");
-  const [swingN, setSwingN] = useState(2);
   const [stocks, setStocks] = useState([]);     // analyzed stocks (newest first)
   const [selectedId, setSelectedId] = useState(null);
   const [mobileDetail, setMobileDetail] = useState(false); // mobile: show detail view vs. list
   const nextId = useRef(1);
-  const swingTimer = useRef(null);
   const fileRef = useRef(null);
   const [batch, setBatch] = useState(null); // { rows:[{rawSymbol,market,tf}], fileName } while the popup is open
   const [menu, setMenu] = useState(null);   // { x, y, stock } — open right-click menu
@@ -294,7 +214,7 @@ export default function App({ onOpenChart }) {
 
   // Fetch + store one scan. `existingId` re-uses a row (refresh / param change);
   // `mkt` is the scan's market (US / TLV) and drives the ticker suffix.
-  async function fetchStock({ rawSymbol, market: mkt, tf, n, existingId }) {
+  async function fetchStock({ rawSymbol, market: mkt, tf, existingId }) {
     const display = cleanSymbol(rawSymbol);
     if (!display) return;
     const ticker = resolveTicker(rawSymbol, mkt);
@@ -309,7 +229,7 @@ export default function App({ onOpenChart }) {
     setSelectedId(id);
 
     try {
-      const r = await fetch(`/api/analyze?ticker=${encodeURIComponent(ticker)}&swingN=${n}&timeframe=${encodeURIComponent(tf)}&market=${encodeURIComponent(mkt)}`);
+      const r = await fetch(`/api/analyze?ticker=${encodeURIComponent(ticker)}&timeframe=${encodeURIComponent(tf)}&market=${encodeURIComponent(mkt)}`);
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Request failed");
       setStocks((prev) => prev.map((s) => s.id === id
@@ -322,7 +242,7 @@ export default function App({ onOpenChart }) {
 
   function analyze() {
     if (!symbol.trim()) return;
-    fetchStock({ rawSymbol: symbol, market, tf: timeframe, n: swingN });
+    fetchStock({ rawSymbol: symbol, market, tf: timeframe });
     setSymbol("");
     if (isMobile) setMobileDetail(true); // jump to the detail view on phones
   }
@@ -332,21 +252,13 @@ export default function App({ onOpenChart }) {
 
   const selected = stocks.find((s) => s.id === selectedId) || null;
 
-  // Re-run the selected scan when the analysis parameters change, so the detail
-  // genuinely reflects the chosen timeframe / swing sensitivity. A scan keeps its
-  // own market (not the current toggle) so refreshing a TLV scan stays TLV.
+  // Re-run the selected scan when the timeframe changes, so the detail
+  // genuinely reflects the chosen timeframe. A scan keeps its own market
+  // (not the current toggle) so refreshing a TLV scan stays TLV.
   function onTimeframe(tf) {
     setTimeframe(tf);
     if (selected && !selected.loading && selected.data)
-      fetchStock({ rawSymbol: selected.display, market: selected.market, tf, n: swingN, existingId: selected.id });
-  }
-  function onSwing(n) {
-    setSwingN(n);
-    if (swingTimer.current) clearTimeout(swingTimer.current);
-    if (selected && !selected.loading && selected.data) {
-      const { display, market: mkt, id } = selected;
-      swingTimer.current = setTimeout(() => fetchStock({ rawSymbol: display, market: mkt, tf: timeframe, n, existingId: id }), 450);
-    }
+      fetchStock({ rawSymbol: selected.display, market: selected.market, tf, existingId: selected.id });
   }
 
   const setOverride = (stockId, checkId, value) =>
@@ -400,7 +312,7 @@ export default function App({ onOpenChart }) {
   function scanAll() {
     if (!batch) return;
     const rows = batch.rows;
-    const n = swingN, tf = timeframe;
+    const tf = timeframe;
 
     // Create all scans as loading stubs upfront
     const ids = rows.map((r) => {
@@ -420,17 +332,17 @@ export default function App({ onOpenChart }) {
     clearBatch();
 
     // Queue them in batches of 5
-    processBatchQueue(ids, 0, n, tf);
+    processBatchQueue(ids, 0, tf);
   }
 
   // Fetch a batch of scans concurrently (max 5 at a time), then recursively process the next batch
-  async function processBatchQueue(ids, startIdx, n, tf) {
+  async function processBatchQueue(ids, startIdx, tf) {
     if (startIdx >= ids.length) return;
 
     const batchItems = ids.slice(startIdx, startIdx + 5);
     const results = await Promise.all(
       batchItems.map((x) =>
-        fetch(`/api/analyze?ticker=${encodeURIComponent(x.ticker)}&swingN=${n}&timeframe=${encodeURIComponent(x.row.tf)}&market=${encodeURIComponent(x.market)}`)
+        fetch(`/api/analyze?ticker=${encodeURIComponent(x.ticker)}&timeframe=${encodeURIComponent(x.row.tf)}&market=${encodeURIComponent(x.market)}`)
           .then((r) => r.json())
           .then((j) => (!j.error ? { id: x.id, data: j } : { id: x.id, error: j.error || "Failed" }))
           .catch((e) => ({ id: x.id, error: e.message }))
@@ -453,7 +365,7 @@ export default function App({ onOpenChart }) {
     );
 
     // Process next batch
-    processBatchQueue(ids, startIdx + 5, n, tf);
+    processBatchQueue(ids, startIdx + 5, tf);
   }
 
   return (
@@ -469,7 +381,6 @@ export default function App({ onOpenChart }) {
           isMobile={isMobile}
           timeframe={timeframe} onTimeframe={onTimeframe}
           market={market} setMarket={setMarket}
-          swingN={swingN} onSwing={onSwing}
           symbol={symbol} setSymbol={setSymbol} analyze={analyze}
           stocks={stocks} selectedId={selectedId} setSelectedId={selectStock} removeStock={removeStock}
           onBatch={openBatch} onDownloadDemo={downloadDemoFile}
@@ -482,7 +393,7 @@ export default function App({ onOpenChart }) {
           onBack={() => setMobileDetail(false)}
           stock={selected}
           setOverride={setOverride}
-          refresh={() => selected && fetchStock({ rawSymbol: selected.display, market: selected.market, tf: timeframe, n: swingN, existingId: selected.id })}
+          refresh={() => selected && fetchStock({ rawSymbol: selected.display, market: selected.market, tf: timeframe, existingId: selected.id })}
         />
       )}
 
@@ -532,7 +443,7 @@ function BatchModal({ batch, onScanAll, onCancel }) {
 }
 
 // ── Sidebar ─────────────────────────────────────────────────
-function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, onSwing, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId, removeStock, onBatch, onDownloadDemo, onExportAll, onContext }) {
+function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, symbol, setSymbol, analyze, stocks, selectedId, setSelectedId, removeStock, onBatch, onDownloadDemo, onExportAll, onContext }) {
   const [tfHover, setTfHover] = useState(false);
   const [mkHover, setMkHover] = useState(false);
   const [anHover, setAnHover] = useState(false);
@@ -603,21 +514,6 @@ function Sidebar({ isMobile, timeframe, onTimeframe, market, setMarket, swingN, 
           style={{ ...ctlBtn, ...mobileFull, background: anHover ? "rgba(255,255,255,0.78)" : "#fff", color: C.card }}>
           Analyze
         </button>
-      </div>
-
-      {/* Swing sensitivity (kept from the engine; styled to the design) */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 16, background: C.card, borderRadius: 24,
-        boxShadow: INSET, padding: "14px 20px", flexShrink: 0,
-      }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          <span style={{ font: `700 14px ${FONT}`, color: C.t70, whiteSpace: "nowrap" }}>Swing sensitivity</span>
-          <HelpTip title="Swing sensitivity"><SwingHelp /></HelpTip>
-        </span>
-        <input type="range" min={1} max={5} value={swingN}
-          onChange={(e) => onSwing(+e.target.value)}
-          style={{ flex: 1, minWidth: 0, accentColor: C.green }} />
-        <span style={{ font: `700 16px ${FONT}`, color: "#fff", minWidth: 16, textAlign: "center" }}>{swingN}</span>
       </div>
 
       {/* Batch analysis + demo + sorting (shown once there are results) */}
@@ -1286,7 +1182,7 @@ function ChartCanvas({ data, tier, view, setView, W, H, maxH, structure }) {
         ))}
 
         {/* Structure: zigzag through the peaks & troughs with HH/HL/LH/LL
-            labels (server-computed with the same swingN as the verdict). */}
+            labels (server-computed from the verdict's sequence points). */}
         {structure && (data.peaks?.points || []).length >= 2 && (() => {
           const pts = data.peaks.points;
           const AMBER = "#E0A458";
@@ -1524,7 +1420,6 @@ function scanRecord(stock) {
     Timeframe: d.timeframe || "",
     "Last candle": d.lastDate || "",
     "Fetched at": stock.fetchedAt ? new Date(stock.fetchedAt).toISOString() : "",
-    "Swing sensitivity": d.swingN ?? "",
     Status: stock.error ? "Error" : stock.loading ? "Loading" : "Analyzed",
     Error: stock.error || "",
     Verdict: concl ? VLABEL[concl.code] : "",
