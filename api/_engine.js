@@ -332,21 +332,26 @@ function analyze(candles, opts = {}) {
   put("P4", falling ? "no" : "yes", "exact",
     falling ? M.P4no(fallLen) : M.P4yes());
 
-  // P5 — only if a fall just broke: latest swing low > previous swing low. Else N/A.
-  const lows = pivots.pl;
-  if (lows.length >= 2) {
-    const a = lows[lows.length - 1], b = lows[lows.length - 2];
-    // "just broke" heuristic: most recent pivot low is within last ~6 candles
-    const recentlyBroke = last - a.i <= 6;
-    if (recentlyBroke) {
-      put("P5", a.price > b.price ? "yes" : "no", "swing",
-        M.P5cmp(a.price.toFixed(2), b.price.toFixed(2)));
-    } else put("P5", "na", "swing", M.P5naRecent());
+  // P5 — the prior UPTREND was making HIGHER LOWS: its last two swing lows,
+  // strictly BEFORE the most recent peak (Phase A, excluding the current
+  // correction's own bottom), are ascending. Anchoring to the uptrend troughs —
+  // not "the last two confirmed lows" — keeps P5 consistent with the phase model
+  // so the correction's launch-trough undercut (Q7) does not spuriously fail this
+  // pre-filter. N/A when there aren't two uptrend lows to compare.
+  const upLowsP5 = pivots.pl.filter((p) => seg.highestHighIdx == null || p.i < seg.highestHighIdx);
+  if (upLowsP5.length >= 2) {
+    const a = upLowsP5[upLowsP5.length - 1], b = upLowsP5[upLowsP5.length - 2];
+    put("P5", a.price > b.price ? "yes" : "no", "swing",
+      M.P5cmp(a.price.toFixed(2), b.price.toFixed(2)));
   } else put("P5", "na", "swing", M.P5naFew());
 
-  // ===== PHASE A =====
-  // Q1 — rising peaks AND rising troughs (last 2 of each)
-  const ph = pivots.ph, pl = pivots.pl;
+  // ===== PHASE A ===== (the PRIOR UPTREND, up to the most recent peak)
+  // Q1 — rising peaks AND rising troughs (last 2 of each) in the uptrend that
+  // preceded the current correction. Restricted to swing highs at/before the
+  // most recent peak and swing lows strictly before it, so the correction's own
+  // (lower) bottom — Phase B — is NOT counted against the Phase-A structure.
+  const ph = pivots.ph.filter((p) => seg.highestHighIdx == null || p.i <= seg.highestHighIdx);
+  const pl = pivots.pl.filter((p) => seg.highestHighIdx == null || p.i < seg.highestHighIdx);
   if (ph.length >= 2 && pl.length >= 2) {
     const risingPeaks = ph[ph.length - 1].price > ph[ph.length - 2].price;
     const risingTroughs = pl[pl.length - 1].price > pl[pl.length - 2].price;
@@ -412,27 +417,19 @@ function analyze(candles, opts = {}) {
   put("Q6", cciHit ? "yes" : "no", "exact",
     M.Q6(isFinite(cciMin) ? cciMin.toFixed(0) : null));
 
-  // Q7 — ≥1 candle in the current correction is COMPLETELY below the low of the
-  // HIGHEST candle in the prior rising sequence (checklist C3), incl. upper tail
-  // (high < level). Anchored to the PEAK candle's low — the reference the doc
-  // names as the source of truth.
-  //
-  // NOTE (deviation from the task prose): the task asked to anchor Q7 to the
-  // LAUNCH TROUGH of the most recent rising sequence. That anchor is provably
-  // mutually exclusive with P5 (higher-low pre-filter) and Q1 (rising troughs):
-  // a correction shallow enough to keep the uptrend intact never undercuts the
-  // launch trough, and one deep enough to undercut it turns the last swing low
-  // into a lower low — so every chart returns DO_NOT_ENTER. The task's own
-  // meta-rule ("the METHOD wins where code and method disagree") plus checklist
-  // C3 resolve the conflict in favor of the peak candle's low, which is
-  // internally consistent: a healthy pullback drops below the peak's low while
-  // still forming a higher swing low.
-  if (seg.highestHighIdx != null) {
-    const anchorLow = c.low[seg.highestHighIdx];
+  // Q7 — ≥1 candle in the current correction is COMPLETELY below the swing LOW
+  // that the most recent rising sequence LAUNCHED FROM (the last confirmed
+  // trough before the peak = seg.priorSeqLow), incl. upper tail (high < level).
+  // This is the course's "prior sequence low" undercut: it confirms the falling
+  // sequence gave back the whole most-recent leg. Because Q1/P5 measure the
+  // PRIOR-UPTREND structure (Phase A, up to the peak) and this measures the
+  // CORRECTION (Phase B), the two describe different stretches and do not
+  // conflict — the correction's own lower low is not counted against the uptrend.
+  if (seg.priorSeqLow != null && seg.highestHighIdx != null) {
     let undercut = false;
-    for (let i = seg.highestHighIdx + 1; i <= last; i++) if (c.high[i] < anchorLow) { undercut = true; break; }
+    for (let i = seg.highestHighIdx + 1; i <= last; i++) if (c.high[i] < seg.priorSeqLow) { undercut = true; break; }
     put("Q7", undercut ? "yes" : "no", "swing",
-      M.Q7(anchorLow.toFixed(2), undercut));
+      M.Q7(seg.priorSeqLow.toFixed(2), undercut));
   } else put("Q7", null, "swing", M.Q7null());
 
   // ===== PHASE C ===== (only one Yes needed)

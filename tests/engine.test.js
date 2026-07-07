@@ -24,17 +24,24 @@ function pushCandle(a, o, c, vol) {
   a.open.push(o); a.close.push(c); a.high.push(hi); a.low.push(lo); a.volume.push(vol);
 }
 
-// Textbook BUY: seed → long clean uptrend (rising peaks+troughs, high volume)
-// → a real correction (below a falling red 5-SMA, CCI washes below −100, price
-// drops entirely below the peak candle's low) → a single turn-up green candle
-// that breaks the falling sequence back up.
+// Textbook BUY (multi-leg, per the sequence method): a rising staircase with
+// TWO higher troughs and rising peaks (T0 < T1, P1 < P2) — the prior uptrend
+// (Phase A) → a real correction (Phase B) that closes below a falling red 5-SMA,
+// washes CCI below −100, and drops a candle entirely below the LAUNCH TROUGH of
+// the most recent rising sequence (T1) → a strong turn-up that breaks the
+// falling sequence back up (Phase C). Phase-A checks (Q1/P5) read the uptrend
+// troughs; Q7 reads the correction's undercut — different stretches, no conflict.
 function textbookBuy() {
   const a = { open: [], high: [], low: [], close: [], volume: [] };
   let p = 20;
-  for (let i = 0; i < 15; i++) { pushCandle(a, p, p + (i % 2 ? 0.1 : -0.1), 1_500_000); p = a.close[a.close.length - 1]; }
-  for (let i = 0; i < 30; i++) { pushCandle(a, p, p + 1.2, 2_500_000); p = a.close[a.close.length - 1]; }
-  for (let i = 0; i < 14; i++) { pushCandle(a, p, p - 0.9, 900_000); p = a.close[a.close.length - 1]; }
-  pushCandle(a, p, p + 1.4, 1_800_000); // turn-up
+  for (let i = 0; i < 8; i++)  { pushCandle(a, p, p + 1.0, 2_000_000); p = a.close[a.close.length - 1]; } // rise0 → P0
+  for (let i = 0; i < 4; i++)  { pushCandle(a, p, p - 1.4, 1_000_000); p = a.close[a.close.length - 1]; } // dip → T0
+  for (let i = 0; i < 10; i++) { pushCandle(a, p, p + 1.2, 2_500_000); p = a.close[a.close.length - 1]; } // rise A → P1
+  for (let i = 0; i < 4; i++)  { pushCandle(a, p, p - 1.4, 1_000_000); p = a.close[a.close.length - 1]; } // dip → T1 (> T0)
+  for (let i = 0; i < 12; i++) { pushCandle(a, p, p + 1.3, 2_500_000); p = a.close[a.close.length - 1]; } // rise B → P2
+  for (let i = 0; i < 14; i++) { pushCandle(a, p, p - 1.5, 900_000);   p = a.close[a.close.length - 1]; } // correction (undercuts T1)
+  pushCandle(a, p, p + 2.4, 1_600_000); p = a.close[a.close.length - 1]; // strong turn-up 1
+  pushCandle(a, p, p + 2.4, 1_800_000);                                  // strong turn-up 2 (breaks fall)
   return a;
 }
 
@@ -64,13 +71,15 @@ function riseThenDecline() {
 })();
 
 (function q4DoesNotHardFail() {
-  // Even though Q4 is a "no" guess on the textbook setup, the verdict is still
-  // a buy — the guess-tier check must be advisory, not a hard gate.
+  // Q4 is a guess-tier check the README flags as needing visual confirmation, so
+  // it must be advisory — never a hard gate. Force it to "no" on an otherwise
+  // valid buy and confirm the verdict is unchanged.
   const r = analyze(textbookBuy(), {});
+  r.checks.Q4 = { value: "no", conf: "guess", why: "forced 'no' for the test" };
   const c = conclude(r);
-  assert.strictEqual(r.checks.Q4.value, "no", "sanity: Q4 guess is 'no' here");
   assert.strictEqual(c.q4Advisory, "no", "Q4 surfaced as advisory");
   assert.ok(c.allPass, "allPass true despite Q4 'no' (Q4 non-blocking)");
+  assert.ok(c.code === "BUY" || c.code === "BUY_LIMIT", `verdict still a buy, got ${c.code}`);
   ok("Q4 'no' does not block an otherwise-valid buy");
 })();
 

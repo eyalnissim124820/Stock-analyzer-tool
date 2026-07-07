@@ -42,12 +42,12 @@
     "P5": {
      "value": "na",
      "conf": "swing",
-     "why": "No falling sequence just broke"
+     "why": "Not enough swing lows to compare"
     },
     "Q1": {
      "value": "yes",
-     "conf": "swing",
-     "why": "Peaks 193.35→197.78, troughs 177.74→184.61"
+     "conf": "guess",
+     "why": "Sparse pivots — coarse half-vs-half structure check; confirm visually"
     },
     "Q2": {
      "value": "no",
@@ -75,9 +75,9 @@
      "why": "Min CCI(5) in correction ≈ -167 (need < −100)"
     },
     "Q7": {
-     "value": "yes",
+     "value": "no",
      "conf": "swing",
-     "why": "Prior sequence low 195.06; a candle closed entirely below it"
+     "why": "Prior sequence low 177.74; no full undercut"
     },
     "Q8": {
      "value": "yes",
@@ -1699,14 +1699,14 @@
      "why": "Recent closes not strictly descending"
     },
     "P5": {
-     "value": "na",
+     "value": "yes",
      "conf": "swing",
-     "why": "No falling sequence just broke"
+     "why": "Latest swing low 171.81 vs previous 161.60"
     },
     "Q1": {
      "value": "yes",
      "conf": "swing",
-     "why": "Peaks 185.39→189.32, troughs 171.81→173.70"
+     "why": "Peaks 185.39→189.32, troughs 161.60→171.81"
     },
     "Q2": {
      "value": "no",
@@ -1734,9 +1734,9 @@
      "why": "Min CCI(5) in correction ≈ -167 (need < −100)"
     },
     "Q7": {
-     "value": "yes",
+     "value": "no",
      "conf": "swing",
-     "why": "Prior sequence low 186.40; a candle closed entirely below it"
+     "why": "Prior sequence low 171.81; no full undercut"
     },
     "Q8": {
      "value": "yes",
@@ -3370,14 +3370,14 @@
      "why": "הסגירות האחרונות אינן בירידה רציפה"
     },
     "P5": {
-     "value": "na",
+     "value": "yes",
      "conf": "swing",
-     "why": "לא נשבר לאחרונה רצף יורד"
+     "why": "שפל אחרון 60.18 מול השפל הקודם 58.07"
     },
     "Q1": {
      "value": "no",
      "conf": "swing",
-     "why": "פסגות 77.07→63.23, שפלים 60.18→57.58"
+     "why": "פסגות 77.07→63.23, שפלים 58.07→60.18"
     },
     "Q2": {
      "value": "yes",
@@ -3407,7 +3407,7 @@
     "Q7": {
      "value": "yes",
      "conf": "swing",
-     "why": "שפל הרצף הקודם 60.81; נר ירד כולו מתחתיו"
+     "why": "שפל הרצף הקודם 60.18; נר ירד כולו מתחתיו"
     },
     "Q8": {
      "value": "yes",
@@ -5059,9 +5059,9 @@
      "why": "Recent closes not strictly descending"
     },
     "P5": {
-     "value": "na",
+     "value": "yes",
      "conf": "swing",
-     "why": "No falling sequence just broke"
+     "why": "Latest swing low 125.62 vs previous 122.95"
     },
     "Q1": {
      "value": "yes",
@@ -5096,7 +5096,7 @@
     "Q7": {
      "value": "no",
      "conf": "swing",
-     "why": "Prior sequence low 144.77; no full undercut"
+     "why": "Prior sequence low 125.62; no full undercut"
     },
     "Q8": {
      "value": "yes",
