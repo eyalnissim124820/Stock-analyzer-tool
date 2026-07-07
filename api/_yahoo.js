@@ -26,9 +26,51 @@ function normalizeTicker(ticker, market) {
   return market === "TLV" ? `${s}.TA` : s;
 }
 
-// Generic fetch: any interval/range. Returns cleaned OHLCV (oldest→newest)
-// plus dates/meta, or throws with a human-readable message.
-async function fetchRaw(ticker, interval, range, { minBars = 30 } = {}) {
+// ── TASE calendar aggregation ──
+// Yahoo's own 1wk bars are Monday-anchored. TASE trades Sunday–Thursday, so a
+// Monday-anchored "week" both misses the Israeli week's opening Sunday session
+// AND swallows the NEXT week's Sunday — every weekly candle comes out with a
+// different open/high/low/close than the Israeli platforms (bursagraph et al.)
+// build for the same stock. For .TA symbols we therefore fetch DAILY bars and
+// aggregate the weekly/monthly candles ourselves on the Israeli calendar:
+// weeks run Sunday→Thursday (group key = the Sunday on/before the session
+// date), months are calendar months. TASE session timestamps are session-start
+// in Asia/Jerusalem (UTC+2/+3), so the UTC date of the timestamp IS the local
+// trading date — no further tz math needed.
+const DAY = 86400;
+function taseGroupKey(ts, interval) {
+  const d = new Date(ts * 1000);
+  if (interval === "1mo") return d.getUTCFullYear() * 12 + d.getUTCMonth();
+  return Math.floor(ts / DAY) - d.getUTCDay(); // day-number of the week's Sunday
+}
+
+// Aggregate cleaned daily candles into Israeli weekly/monthly bars. Each bar:
+// open of the first session, close of the last, extreme high/low, summed
+// volume — and it carries the LAST session's timestamp, so the bar is dated by
+// its closing day (the Israeli chart convention: a weekly candle shows its
+// Thursday date).
+function aggregateTaseCandles(candles, T, interval) {
+  const { open, high, low, close, volume } = candles;
+  const O = [], H = [], L = [], C = [], V = [], TT = [];
+  let key = null;
+  for (let i = 0; i < close.length; i++) {
+    const k = taseGroupKey(T[i], interval);
+    if (k !== key) {
+      key = k;
+      O.push(open[i]); H.push(high[i]); L.push(low[i]); C.push(close[i]);
+      V.push(volume[i]); TT.push(T[i]);
+    } else {
+      const j = C.length - 1;
+      H[j] = Math.max(H[j], high[i]);
+      L[j] = Math.min(L[j], low[i]);
+      C[j] = close[i]; V[j] += volume[i]; TT[j] = T[i];
+    }
+  }
+  return { candles: { open: O, high: H, low: L, close: C, volume: V }, T: TT };
+}
+
+// Raw Yahoo hit: cleaned OHLCV arrays + timestamps + meta, no bar-count floor.
+async function fetchYahoo(ticker, interval, range) {
   const url =
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}` +
     `?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}&includePrePost=false`;
@@ -58,10 +100,24 @@ async function fetchRaw(ticker, interval, range, { minBars = 30 } = {}) {
     O.push(open[i]); H.push(high[i]); L.push(low[i]); C.push(close[i]);
     V.push(volume[i] == null ? 0 : volume[i]); T.push(ts[i]);
   }
-  if (C.length < minBars) throw new Error(`Only ${C.length} clean candles — need ~${minBars}+. Try a more liquid ticker.`);
+  return { candles: { open: O, high: H, low: L, close: C, volume: V }, T, meta };
+}
+
+// Generic fetch: any interval/range. Returns cleaned OHLCV (oldest→newest)
+// plus dates/meta, or throws with a human-readable message. For .TA symbols
+// at 1wk/1mo the bars are built from dailies on the Israeli calendar (above);
+// everything else takes Yahoo's own bars unchanged.
+async function fetchRaw(ticker, interval, range, { minBars = 30 } = {}) {
+  const tase = /\.TA$/i.test(ticker) && (interval === "1wk" || interval === "1mo");
+  const raw = await fetchYahoo(ticker, tase ? "1d" : interval, range);
+  const { candles, T } = tase ? aggregateTaseCandles(raw.candles, raw.T, interval) : raw;
+  const meta = raw.meta;
+  if (candles.close.length < minBars) {
+    throw new Error(`Only ${candles.close.length} clean candles — need ~${minBars}+. Try a more liquid ticker.`);
+  }
 
   return {
-    candles: { open: O, high: H, low: L, close: C, volume: V },
+    candles,
     dates: T.map((t) => new Date(t * 1000).toISOString().slice(0, 10)),
     lastDate: T.length ? new Date(T[T.length - 1] * 1000).toISOString().slice(0, 10) : null,
     currency: meta.currency || null,
@@ -76,4 +132,4 @@ async function fetchCandles(ticker, timeframe, opts) {
   return fetchRaw(ticker, tf.interval, tf.range, opts);
 }
 
-module.exports = { TIMEFRAMES, normalizeTicker, fetchRaw, fetchCandles };
+module.exports = { TIMEFRAMES, normalizeTicker, fetchRaw, fetchCandles, aggregateTaseCandles, taseGroupKey };

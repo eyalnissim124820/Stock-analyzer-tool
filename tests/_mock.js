@@ -62,6 +62,16 @@ function jsonResponse(obj, status = 200) {
   return { ok: status >= 200 && status < 300, status, json: async () => obj };
 }
 
+// Bar count implied by a range+interval pair — mirrors how Yahoo sizes its
+// responses, so the handlers' TASE daily→weekly/monthly aggregation still
+// clears the min-bar floors (a 2y daily fetch must yield ~2 years of dailies,
+// not a fixed 140).
+const RANGE_DAYS = { "1mo": 31, "3mo": 92, "6mo": 183, "1y": 366, "2y": 731, "5y": 1827, "10y": 3653, "max": 3653 };
+function barsFor(range, interval) {
+  const step = { "1d": 1, "1wk": 7, "1mo": 30, "3mo": 91 }[interval] || 1;
+  return Math.max(10, Math.round((RANGE_DAYS[range] || 366) / step));
+}
+
 // Install a fetch stub. `extra(url)` may return a fixture object (served as
 // JSON), a {status, body} pair, or undefined to fall through to the chart
 // fixture. Every call is recorded in the returned `calls` array.
@@ -79,7 +89,7 @@ function installFetchStub(extra) {
     const m = String(url).match(/\/v8\/finance\/chart\/([^?]+)\?range=([^&]+)&interval=([^&]+)/);
     if (m) {
       const symbol = decodeURIComponent(m[1]);
-      return jsonResponse(yahooChartFixture(symbol, m[3]));
+      return jsonResponse(yahooChartFixture(symbol, m[3], barsFor(decodeURIComponent(m[2]), m[3])));
     }
     return jsonResponse({ error: "unmocked url in test: " + url }, 404);
   };

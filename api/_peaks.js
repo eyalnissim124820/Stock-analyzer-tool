@@ -22,6 +22,8 @@
 // Consumed by api/chart.js and api/analyze.js. _engine.js is left untouched.
 // ─────────────────────────────────────────────────────────────
 
+const { sequenceStructure } = require("./_engine.js");
+
 // Wilder ATR, null-padded and index-aligned like the _engine.js series.
 function atrSeries(highs, lows, closes, p = 14) {
   const n = closes.length;
@@ -138,42 +140,32 @@ function zigzagLookback(candles, { lookback = 2 } = {}) {
 // ── sequence-break ZigZag (the course method) ──
 // A peak (שיא) forms when a RISING sequence breaks — a bar closes below the
 // low of the highest bar in the run; a trough (שפל) when a FALLING sequence
-// breaks — a close above the high of the lowest bar. Same state machine as
-// findSequencePoints in api/_engine.js (Session 02/03 definition; keep the two
-// in sync), but emits merged alternating points and flags the still-running
-// sequence's extreme `provisional` so the UI can draw its leg dashed.
+// breaks — a close above the high of the lowest bar.
+//
+// This is the SINGLE source-of-truth definition: it delegates to
+// sequenceStructure in api/_engine.js (the course's exact model, which also
+// drives the analyzer's Q-checks, the sell signal S1, and the strategy tool) so
+// the chart can never drift from the breakdown. A previous hand-written copy
+// here diverged (it gated the break test on the PREVIOUS bar's low and so
+// missed intermediate swings) — do not reintroduce a parallel state machine;
+// change sequenceStructure and both surfaces move together.
+//
+// We adapt the engine's { highs, lows, current } shape into merged alternating
+// points and flag the still-running sequence's extreme `provisional` so the UI
+// can draw its leg dashed. Each confirmed point carries `breakIdx` — the bar
+// whose close broke the sequence and confirmed it — so the chart can mark the
+// break candle too (the reference platform's red/green triangles).
 function zigzagSequence(candles) {
-  const { high, low, close } = candles;
+  const { open, high, low, close } = candles;
   const n = close.length;
-  const pts = [];
-  if (n < 2) return pts;
-  let dir = 0;                 // +1 rising, -1 falling, 0 unset
-  let extremeIdx = 0;          // highest bar (rising) or lowest bar (falling)
-  for (let i = 1; i < n; i++) {
-    if (dir >= 0 && close[i] > low[i - 1]) {
-      dir = 1;
-      if (high[i] >= high[extremeIdx]) extremeIdx = i;
-      continue;
-    }
-    if (dir === 1 && close[i] < low[extremeIdx]) {
-      pts.push({ i: extremeIdx, price: high[extremeIdx], kind: "H" });
-      dir = -1; extremeIdx = i;
-      continue;
-    }
-    if (dir <= 0 && close[i] < high[i - 1]) {
-      dir = -1;
-      if (low[i] <= low[extremeIdx]) extremeIdx = i;
-      continue;
-    }
-    if (dir === -1 && close[i] > high[extremeIdx]) {
-      pts.push({ i: extremeIdx, price: low[extremeIdx], kind: "L" });
-      dir = 1; extremeIdx = i;
-      continue;
-    }
-    if (dir === 1 && high[i] >= high[extremeIdx]) extremeIdx = i;
-    if (dir === -1 && low[i] <= low[extremeIdx]) extremeIdx = i;
-  }
+  if (n < 2) return [];
+  const { highs, lows, current } = sequenceStructure(open, high, low, close);
+  const pts = [
+    ...highs.map((h) => ({ i: h.i, price: h.high, kind: "H", breakIdx: h.breakIdx })),
+    ...lows.map((l) => ({ i: l.i, price: l.low, kind: "L", breakIdx: l.breakIdx })),
+  ].sort((a, b) => a.i - b.i);
   // The running sequence hasn't broken yet — its extreme is not a confirmed point.
+  const { dir, extremeIdx } = current;
   if (dir === 1) pts.push({ i: extremeIdx, price: high[extremeIdx], kind: "H", provisional: true });
   else if (dir === -1) pts.push({ i: extremeIdx, price: low[extremeIdx], kind: "L", provisional: true });
   return pts;
