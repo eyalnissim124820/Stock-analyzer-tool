@@ -12,7 +12,8 @@
 // These are pure-function tests; no network, no fixtures.
 // ─────────────────────────────────────────────────────────────
 const assert = require("assert");
-const { analyze, conclude } = require("../api/_engine.js");
+const { analyze, conclude, sequenceStructure, sequenceSellS1 } = require("../api/_engine.js");
+const analyzeHandler = require("../api/analyze.js");
 
 let pass = 0;
 const ok = (name) => { pass++; console.log(`  ok — ${name}`); };
@@ -78,6 +79,114 @@ function riseThenDecline() {
   const c = conclude(r);
   assert.strictEqual(c.code, "DO_NOT_ENTER", `bad setup should be DO_NOT_ENTER, got ${c.code}`);
   ok("declining structure returns DO_NOT_ENTER");
+})();
+
+// ---- PART 1: sequence structure (course's exact definition) ----------------
+// Build OHLC candles directly for full control over the walker.
+function candles(rows) {
+  const open = [], high = [], low = [], close = [], volume = [];
+  for (const [o, h, l, c] of rows) { open.push(o); high.push(h); low.push(l); close.push(c); volume.push(1_500_000); }
+  return { open, high, low, close, volume };
+}
+
+(function sequenceExactSwings() {
+  // Rising → break (peak) → falling → break (trough) → rising. Hand-computed.
+  //   idx: 0     1      2      3        4        5      6      7        8      9
+  const c = candles([
+    [10, 11, 9, 10.5],    // 0  first bar = initial running extreme
+    [10.5, 12, 10, 11.5], // 1  rising; new high → running peak
+    [11.5, 13, 11, 12.5], // 2  new high → running peak
+    [12.5, 13.5, 12, 13], // 3  new high → running peak (high 13.5, low 12)
+    [13, 13.2, 10, 10.5], // 4  close 10.5 < peak(3).low 12 → confirm PEAK@3; start falling
+    [10.5, 11, 8, 9],     // 5  new low → running trough
+    [9, 9.5, 7, 8.5],     // 6  new low → running trough (low 7, high 9.5)
+    [8.5, 10, 8, 9.8],    // 7  close 9.8 > trough(6).high 9.5 → confirm TROUGH@6; start rising
+    [9.8, 12, 9.5, 11.5], // 8  new high → running peak
+    [11.5, 13, 11, 12.5], // 9  new high → running peak (in-progress, unconfirmed)
+  ]);
+  const s = sequenceStructure(c.open, c.high, c.low, c.close);
+  assert.deepStrictEqual(
+    s.highs.map((h) => ({ i: h.i, high: h.high, breakIdx: h.breakIdx })),
+    [{ i: 3, high: 13.5, breakIdx: 4 }], "one confirmed swing high at idx 3");
+  assert.deepStrictEqual(
+    s.lows.map((l) => ({ i: l.i, low: l.low, breakIdx: l.breakIdx })),
+    [{ i: 6, low: 7, breakIdx: 7 }], "one confirmed swing low at idx 6");
+  assert.deepStrictEqual(s.current, { dir: 1, extremeIdx: 9 }, "in-progress rising, running peak at idx 9");
+  ok("sequence walker matches hand-computed swing highs/lows and current run");
+})();
+
+(function boundaryCloseEqualsPeakLowDoesNotBreak() {
+  // A candle whose CLOSE == the running peak's low must NOT break the sequence.
+  const rows = [
+    [10, 11, 9, 10.5],    // 0
+    [10.5, 12, 10, 11.5], // 1  running peak
+    [11.5, 13, 11, 12.5], // 2  running peak (low 11)
+    [12.5, 12.8, 11, 11], // 3  close 11 == peak(2).low 11 → NO break (strict <)
+    [11, 11.5, 10, 10.9], // 4  close 10.9 < 11 → NOW break, confirm PEAK@2
+  ];
+  const upToBoundary = candles(rows.slice(0, 4)); // through idx 3 only
+  const s1 = sequenceStructure(upToBoundary.open, upToBoundary.high, upToBoundary.low, upToBoundary.close);
+  assert.strictEqual(s1.highs.length, 0, "close == peak low does not confirm a peak");
+
+  const withBreak = candles(rows); // through idx 4
+  const s2 = sequenceStructure(withBreak.open, withBreak.high, withBreak.low, withBreak.close);
+  assert.deepStrictEqual(
+    s2.highs.map((h) => ({ i: h.i, breakIdx: h.breakIdx })),
+    [{ i: 2, breakIdx: 4 }], "peak confirmed only on the strictly-below close at idx 4");
+  ok("boundary: close == peak low continues the sequence; strict below breaks it");
+})();
+
+(function s1FiresOnExactBreakCandle() {
+  const c = candles([
+    [10, 11, 9, 10.5],    // 0
+    [10.5, 12, 10, 11.5], // 1  running peak
+    [11.5, 13, 11, 12.5], // 2  running peak
+    [12.5, 13.5, 12, 13], // 3  running peak (low 12)
+    [13, 13.2, 10, 11.5], // 4  close 11.5 < peak(3).low 12 → breaks the rising sequence
+  ]);
+  const atBreak = sequenceSellS1(c, 4);
+  assert.strictEqual(atBreak.fired, true, "S1 fires on the candle that closes below the running peak's low");
+  assert.strictEqual(atBreak.peakIdx, 3, "S1 reports the peak it broke");
+  const beforeBreak = sequenceSellS1(c, 3);
+  assert.strictEqual(beforeBreak.fired, false, "S1 does not fire before the break candle");
+  ok("sell S1 fires on exactly the bar that ends the rising sequence");
+})();
+
+// ---- PART 2: entry candle = most recent CLOSED candle ----------------------
+(function entryCandleDropsFormingBar() {
+  const tz = "America/New_York";
+  const day = (s) => Math.floor(Date.parse(s) / 1000);
+  // Daily: last bar timestamped today; session close is 16:00 ET.
+  const meta = { exchangeTimezoneName: tz, currentTradingPeriod: { regular: { end: day("2026-06-26T20:00:00Z") } } };
+  const lastTs = day("2026-06-26T13:30:00Z"); // 09:30 ET, same session date
+  // Intraday (before close) → the last daily bar is still forming.
+  assert.strictEqual(
+    analyzeHandler.isLastBarForming(meta, lastTs, "1d", day("2026-06-26T18:00:00Z")), true,
+    "intraday daily bar is forming");
+  // After the session close → the same bar is now final.
+  assert.strictEqual(
+    analyzeHandler.isLastBarForming(meta, lastTs, "1d", day("2026-06-26T20:30:00Z")), false,
+    "after close, the daily bar is final");
+  // Monthly: a bar in the current calendar month is forming; a prior-month bar is not.
+  const monMeta = { exchangeTimezoneName: tz };
+  assert.strictEqual(analyzeHandler.isLastBarForming(monMeta, day("2026-06-10T12:00:00Z"), "1mo", day("2026-06-26T12:00:00Z")), true, "current-month bar forming");
+  assert.strictEqual(analyzeHandler.isLastBarForming(monMeta, day("2026-05-10T12:00:00Z"), "1mo", day("2026-06-26T12:00:00Z")), false, "prior-month bar final");
+
+  // Integration: dropping the forming bar makes the analysis key off the prior
+  // (closed) bar as the entry candle.
+  const base = textbookBuy();
+  const forming = { // append a still-forming red bar after the closed turn-up
+    open: [...base.open, base.close[base.close.length - 1]],
+    high: [...base.high, base.close[base.close.length - 1] + 0.2],
+    low: [...base.low, base.close[base.close.length - 1] - 3],
+    close: [...base.close, base.close[base.close.length - 1] - 2.5],
+    volume: [...base.volume, 500_000],
+  };
+  const full = analyze(forming, {});   // analyzes the forming bar as entry (wrong)
+  const dropped = analyze(base, {});    // entry = the closed turn-up (right)
+  assert.notStrictEqual(full.math.buy, dropped.math.buy, "forming vs dropped pick different entry candles");
+  assert.strictEqual(dropped.math.buy, base.close[base.close.length - 1], "entry candle is the last CLOSED bar");
+  ok("entry-candle guard flags a forming bar (daily/monthly) and drops it");
 })();
 
 console.log(`\nengine.test.js — ${pass} checks passed`);

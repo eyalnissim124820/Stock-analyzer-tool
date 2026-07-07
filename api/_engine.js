@@ -132,55 +132,94 @@ function candleAt(c, i) {
 const isSeller = (k) => k.green && k.upper >= 2 * k.body && k.body > 0;
 const isBuyer = (k) => k.green && k.lower >= 2 * k.body && k.body > 0;
 
-// ---------- sequence-based extreme points (method-correct) ----------
-// Peaks (שיא) form when a RISING sequence breaks; troughs (שפל) when a
-// FALLING sequence breaks. Definition per the course (Session 02/03):
-//   • Rising sequence: each bar's close is higher than the previous bar's low.
-//     It breaks when a bar closes below the low of the highest bar in the run
-//     → that highest bar is the peak.
-//   • Falling sequence: each bar's close is lower than the previous bar's high.
-//     It breaks when a bar closes above the high of the lowest bar in the run
-//     → that lowest bar is the trough.
-// Points are confirmed only on the close of the breaking bar — no look-ahead.
-// Drives Q1, P5, Q7, and the highest-high target.
-// Returns the SAME shape as findPivots: { ph:[{i,price}], pl:[{i,price}] }.
-function findSequencePoints(open, high, low, close) {
+// ---------- sequence structure — the course's EXACT definition ----------
+// Swing highs/lows come from a running-extreme sequence, judged on the CLOSE
+// against the WICK (tail-inclusive extreme) of the running-extreme candle —
+// NOT from fractal ±N pivots.
+//
+//   RISING sequence — running peak = highest-HIGH candle so far in the run.
+//     • Continues while the close stays ≥ the LOW of the running-peak candle.
+//     • A new higher high moves the running peak forward.
+//     • ENDS when a candle CLOSES BELOW the running-peak candle's low → that
+//       running peak is a confirmed swing HIGH; a falling sequence begins.
+//       (This break rule is identical to sell signal S1.)
+//   FALLING sequence — running trough = lowest-LOW candle so far (mirror).
+//     • Continues while the close stays ≤ the HIGH of the running-trough candle.
+//     • A new lower low moves the running trough forward.
+//     • ENDS when a candle CLOSES ABOVE the running-trough candle's high → that
+//       running trough is a confirmed swing LOW; a rising sequence begins.
+//
+// Breaks are judged by the CLOSE; the reference level is the extreme candle's
+// wick (its low for a peak, its high for a trough). Points are confirmed only
+// on the close of the breaking bar — no look-ahead. Returns the ordered
+// confirmed swing highs/lows (each with candle index, high, low, close, and the
+// index of the bar that broke/confirmed it) plus the in-progress sequence and
+// its running extreme. Drives Q1/Q2/Q5/Q6/Q7/Q8, the highest-high target, and
+// sell signal S1.
+function sequenceStructure(open, high, low, close) {
   const n = close.length;
-  const ph = [], pl = [];
-  if (n < 2) return { ph, pl };
+  const highs = [], lows = [];
+  if (n === 0) return { highs, lows, current: { dir: 0, extremeIdx: null } };
 
-  // Sequence state machine. dir: +1 rising, -1 falling, 0 unset.
-  let dir = 0;
-  let extremeIdx = 0;          // index of highest bar (rising) or lowest bar (falling)
+  // Initialize direction from the opening candles: if the second bar closes
+  // below the first bar's close we open in a falling sequence, otherwise rising.
+  // Candle 0 is the initial running extreme either way; a wrong initial guess
+  // self-corrects at the first real break.
+  let dir = (n >= 2 && close[1] < close[0]) ? -1 : 1;
+  let extremeIdx = 0;
+
   for (let i = 1; i < n; i++) {
-    if (dir >= 0 && close[i] > low[i - 1]) {
-      // rising continues (or starts)
-      dir = 1;
-      if (high[i] >= high[extremeIdx]) extremeIdx = i;
-      continue;
+    if (dir === 1) {
+      // Rising: a new higher high advances the running peak.
+      if (high[i] > high[extremeIdx]) { extremeIdx = i; continue; }
+      // Break: a close below the running-peak candle's low confirms the peak.
+      // (close == low does NOT break — strict inequality.)
+      if (close[i] < low[extremeIdx]) {
+        highs.push({ i: extremeIdx, high: high[extremeIdx], low: low[extremeIdx], close: close[extremeIdx], breakIdx: i });
+        dir = -1; extremeIdx = i;
+      }
+      // else: sequence continues, running peak unchanged.
+    } else {
+      // Falling: a new lower low advances the running trough.
+      if (low[i] < low[extremeIdx]) { extremeIdx = i; continue; }
+      // Break: a close above the running-trough candle's high confirms the trough.
+      if (close[i] > high[extremeIdx]) {
+        lows.push({ i: extremeIdx, low: low[extremeIdx], high: high[extremeIdx], close: close[extremeIdx], breakIdx: i });
+        dir = 1; extremeIdx = i;
+      }
+      // else: sequence continues, running trough unchanged.
     }
-    if (dir === 1 && close[i] < low[extremeIdx]) {
-      // RISING SEQUENCE BROKE → peak at extremeIdx
-      ph.push({ i: extremeIdx, price: high[extremeIdx] });
-      dir = -1; extremeIdx = i;                // start a falling sequence from here
-      continue;
-    }
-    if (dir <= 0 && close[i] < high[i - 1]) {
-      dir = -1;
-      if (low[i] <= low[extremeIdx]) extremeIdx = i;
-      continue;
-    }
-    if (dir === -1 && close[i] > high[extremeIdx]) {
-      // FALLING SEQUENCE BROKE → trough at extremeIdx
-      pl.push({ i: extremeIdx, price: low[extremeIdx] });
-      dir = 1; extremeIdx = i;                 // start a rising sequence from here
-      continue;
-    }
-    // otherwise: sequence continues without a new extreme; update extreme if needed
-    if (dir === 1 && high[i] >= high[extremeIdx]) extremeIdx = i;
-    if (dir === -1 && low[i] <= low[extremeIdx]) extremeIdx = i;
   }
-  return { ph, pl };
+  return { highs, lows, current: { dir, extremeIdx } };
+}
+
+// Back-compat adapter → the { ph, pl } shape the rest of the codebase consumes
+// (chart zigzag, tracker, sequence tool). Peaks carry their high, troughs their
+// low — same shape as before, now sourced from the exact sequence model above.
+function findSequencePoints(open, high, low, close) {
+  const s = sequenceStructure(open, high, low, close);
+  return {
+    ph: s.highs.map((h) => ({ i: h.i, price: h.high })),
+    pl: s.lows.map((l) => ({ i: l.i, price: l.low })),
+  };
+}
+
+// Sell signal S1 (course exit #1): the entry candle broke the CURRENT rising
+// sequence — it closed below the low of that sequence's running peak. Uses the
+// exact same peak definition as sequenceStructure (a confirmed swing high whose
+// break bar is the entry candle), so the walker and the sell signal never
+// disagree. `asOf` selects the entry candle (defaults to the last bar).
+function sequenceSellS1(candles, asOf) {
+  const { open, high, low, close } = candles;
+  const last = asOf == null ? close.length - 1 : asOf;
+  const sub = { open: open.slice(0, last + 1), high: high.slice(0, last + 1), low: low.slice(0, last + 1), close: close.slice(0, last + 1) };
+  const s = sequenceStructure(sub.open, sub.high, sub.low, sub.close);
+  const lastHigh = s.highs.length ? s.highs[s.highs.length - 1] : null;
+  return {
+    fired: lastHigh != null && lastHigh.breakIdx === last,
+    peakIdx: lastHigh ? lastHigh.i : null,
+    peakLow: lastHigh ? low[lastHigh.i] : null,
+  };
 }
 
 // ---------- swing detection (pivot lookback) — LEGACY ----------
@@ -202,31 +241,43 @@ function findPivots(highs, lows, n = 2) {
   return { ph, pl };
 }
 
-// Identify the last rising sequence and the correction that follows it.
-// Returns indices and the key prices the math + Q7 need.
-function segments(c, pivots) {
-  const { ph, pl } = pivots;
+// Identify the most recent rising sequence and the correction that follows it.
+// Returns indices and the key prices the math + Q7/Q8 need. `struct` is the
+// output of sequenceStructure ({ highs, lows, current }).
+function segments(c, struct) {
+  const { highs, lows } = struct;
   const lastIdx = c.close.length - 1;
-  // Highest pivot high overall recent = end of last rise (the "highest high").
+  // Highest High = the peak of the MOST RECENT rising sequence before the
+  // current correction = the LAST confirmed swing high. This is the reward
+  // target / prior resistance the correction fell from (NOT the maximum peak
+  // over all history — the method targets "the prior peak", not the record high).
   let highestHigh = null, highestHighIdx = null;
-  for (const p of ph) if (highestHigh == null || p.price >= highestHigh) { highestHigh = p.price; highestHighIdx = p.i; }
-  // Fallback: if no clean pivot high, use max high of series.
-  if (highestHigh == null) {
+  if (highs.length) {
+    const peak = highs[highs.length - 1];
+    highestHigh = peak.high; highestHighIdx = peak.i;
+  } else {
+    // Fallback (degenerate / no confirmed peak yet): the highest high overall.
     highestHighIdx = c.high.indexOf(Math.max(...c.high));
     highestHigh = c.high[highestHighIdx];
   }
-  // Prior rising-sequence low = the pivot low immediately BEFORE the highest high.
+  // Prior sequence low = the trough the most recent rising sequence LAUNCHED
+  // FROM = the last confirmed swing low BEFORE that peak (the Q7 anchor).
   let priorSeqLow = null, priorSeqLowIdx = null;
-  for (const p of pl) if (p.i < highestHighIdx) { priorSeqLow = p.price; priorSeqLowIdx = p.i; }
-  // Fallback: no clean pivot low before the high → use the lowest low in the
-  // window leading up to the high (the base the rise launched from).
+  for (const l of lows) if (l.i < highestHighIdx) { priorSeqLow = l.low; priorSeqLowIdx = l.i; }
+  // Fallback: no confirmed trough before the high → lowest low in the window
+  // leading up to the high (the base the rise launched from).
   if (priorSeqLow == null && highestHighIdx > 0) {
     const start = Math.max(0, highestHighIdx - 20);
     let lo = Infinity, idx = start;
     for (let i = start; i < highestHighIdx; i++) if (c.low[i] < lo) { lo = c.low[i]; idx = i; }
     if (isFinite(lo)) { priorSeqLow = lo; priorSeqLowIdx = idx; }
   }
-  return { highestHigh, highestHighIdx, priorSeqLow, priorSeqLowIdx, lastIdx };
+  // The correction's own bottom = the MOST RECENT confirmed swing low AFTER the
+  // peak (present once the falling sequence has broken up). breakIdx marks the
+  // bar that ended the correction (the turn-up) — used by Q8 K1.
+  let corrLow = null, corrLowIdx = null, corrBreakIdx = null;
+  for (const l of lows) if (l.i > highestHighIdx) { corrLow = l.low; corrLowIdx = l.i; corrBreakIdx = l.breakIdx; }
+  return { highestHigh, highestHighIdx, priorSeqLow, priorSeqLowIdx, corrLow, corrLowIdx, corrBreakIdx, lastIdx };
 }
 
 // ---------- the analysis ----------
@@ -242,13 +293,20 @@ function analyze(candles, opts = {}) {
   const red = redLineSeries(green13, 5);
   const cci = cciSeries(c.high, c.low, c.close, 5);
   const bollLo = bollLowerSeries(c.close, 10, 1);
-  // Method-correct points come from sequence breaks. swingN is accepted and
-  // echoed in meta for API/UI compatibility but no longer affects detection;
+  // Method-correct points come from the sequence structure. swingN is accepted
+  // and echoed in meta for API/UI compatibility but no longer affects detection;
   // the windowed findPivots remains only as a fallback for degenerate inputs.
+  const struct = N < 3
+    ? { highs: [], lows: [], current: { dir: 0, extremeIdx: null } }
+    : sequenceStructure(c.open, c.high, c.low, c.close);
+  // { ph, pl } view for the chart/API zigzag and the sparse-Q1/P5 fallbacks.
   const pivots = N < 3
     ? findPivots(c.high, c.low, swingN)
-    : findSequencePoints(c.open, c.high, c.low, c.close);
-  const seg = segments(c, pivots);
+    : { ph: struct.highs.map((h) => ({ i: h.i, price: h.high })), pl: struct.lows.map((l) => ({ i: l.i, price: l.low })) };
+  const seg = segments(c, struct);
+  // Most recent confirmed swing low (correction bottom / turn-up) and swing high.
+  const lastLow = struct.lows.length ? struct.lows[struct.lows.length - 1] : null;
+  const lastHigh = struct.highs.length ? struct.highs[struct.highs.length - 1] : null;
 
   const k = (i) => candleAt(c, i);
   const lastK = k(last);
@@ -333,7 +391,10 @@ function analyze(candles, opts = {}) {
   put("Q4", q4Guess(c, pivots), "guess", M.Q4());
 
   // ===== PHASE B =====
-  // Q5 — during correction, price below red line AND red line sloping down
+  // Q5 — over the CURRENT falling sequence (the correction, from the most recent
+  // peak through the entry candle) price closed below the red line, AND the red
+  // line is sloping down at the entry candle. The span is the DETECTED
+  // correction (peak→entry), not a fixed trailing window.
   let belowRed = false;
   if (seg.highestHighIdx != null) {
     for (let i = seg.highestHighIdx; i <= last; i++)
@@ -343,19 +404,29 @@ function analyze(candles, opts = {}) {
   put("Q5", belowRed && redDown ? "yes" : "no", "exact",
     M.Q5(belowRed, redDown));
 
-  // Q6 — CCI(5) dropped below −100 during the correction
+  // Q6 — CCI(5) dropped below −100 somewhere in the current falling sequence
+  // (the detected correction, peak→entry — not a fixed trailing window).
   let cciHit = false, cciMin = Infinity;
   const cStart = seg.highestHighIdx ?? Math.max(0, last - 15);
   for (let i = cStart; i <= last; i++) if (cci[i] != null) { cciMin = Math.min(cciMin, cci[i]); if (cci[i] < -100) cciHit = true; }
   put("Q6", cciHit ? "yes" : "no", "exact",
     M.Q6(isFinite(cciMin) ? cciMin.toFixed(0) : null));
 
-  // Q7 — ≥1 correction candle entirely below the low of the HIGHEST candle in
-  // the prior rising sequence (doc C3). Anchoring to the PEAK candle's low — a
-  // local reference at the top of the pullback — confirms a real falling
-  // sequence formed (a lower low), WITHOUT demanding the whole rise be
-  // retraced. The old anchor (seg.priorSeqLow, the base the rise launched from)
-  // required a full retracement, so it failed exactly when the setup was good.
+  // Q7 — ≥1 candle in the current correction is COMPLETELY below the low of the
+  // HIGHEST candle in the prior rising sequence (checklist C3), incl. upper tail
+  // (high < level). Anchored to the PEAK candle's low — the reference the doc
+  // names as the source of truth.
+  //
+  // NOTE (deviation from the task prose): the task asked to anchor Q7 to the
+  // LAUNCH TROUGH of the most recent rising sequence. That anchor is provably
+  // mutually exclusive with P5 (higher-low pre-filter) and Q1 (rising troughs):
+  // a correction shallow enough to keep the uptrend intact never undercuts the
+  // launch trough, and one deep enough to undercut it turns the last swing low
+  // into a lower low — so every chart returns DO_NOT_ENTER. The task's own
+  // meta-rule ("the METHOD wins where code and method disagree") plus checklist
+  // C3 resolve the conflict in favor of the peak candle's low, which is
+  // internally consistent: a healthy pullback drops below the peak's low while
+  // still forming a higher swing low.
   if (seg.highestHighIdx != null) {
     const anchorLow = c.low[seg.highestHighIdx];
     let undercut = false;
@@ -365,12 +436,12 @@ function analyze(candles, opts = {}) {
   } else put("Q7", null, "swing", M.Q7null());
 
   // ===== PHASE C ===== (only one Yes needed)
-  // Q8 — K1: falling sequence broke up (close above prior falling candle's high)
-  //      K2: close above red line
-  let k1 = false;
-  for (let i = last; i >= Math.max(1, last - 4); i--) {
-    if (c.close[i - 1] < c.close[i - 2] && c.close[i] > c.high[i - 1]) { k1 = true; break; }
-  }
+  // Q8 — K1: the current correction's falling sequence broke UP by the sequence
+  //      rule (a candle closed above the running-trough candle's high) — i.e. a
+  //      swing low was confirmed AFTER the peak, with the break at/near the entry
+  //      candle. K2: the entry candle closed above the red line (5 SMA).
+  const k1 = lastLow != null && seg.highestHighIdx != null &&
+    lastLow.i > seg.highestHighIdx && (last - lastLow.breakIdx) <= 3;
   const k2 = red[last] != null && c.close[last] > red[last];
   put("Q8", (k1 || k2) ? "yes" : "no", "exact", M.Q8(k1, k2));
 
@@ -398,6 +469,12 @@ function analyze(candles, opts = {}) {
   if (R.Q8.value === "yes") { if (k1) triggeredK.push("K1"); if (k2) triggeredK.push("K2"); }
   if (R.Q9.value === "yes") { if (k3) triggeredK.push("K3"); if (k4) triggeredK.push("K4"); }
 
+  // Sell signal S1 (exit): the entry candle broke the current rising sequence —
+  // it closed below the low of that sequence's running peak. Reuses the exact
+  // swing-high definition from sequenceStructure (a confirmed peak whose break
+  // bar IS the entry candle), so the buy walker and the sell signal agree.
+  const sellS1 = lastHigh != null && lastHigh.breakIdx === last;
+
   return {
     meta: { bars: N, swingN, lastDate: opts.lastDate ?? null, currency: opts.currency ?? null },
     checks: R,
@@ -405,6 +482,7 @@ function analyze(candles, opts = {}) {
     series: { green13, red, cci, bollLo },
     pivots,
     segments: seg,
+    sell: { S1: sellS1, peakIdx: lastHigh ? lastHigh.i : null, peakLow: lastHigh ? c.low[lastHigh.i] : null },
   };
 }
 
@@ -462,4 +540,4 @@ function conclude(result) {
   return { code, firstFail, preOk, aOk, bOk, cOk, q4Advisory, allPass, ratioOk };
 }
 
-module.exports = { analyze, conclude, smaSeries, redLineSeries, cciSeries, bollLowerSeries, findPivots, findSequencePoints };
+module.exports = { analyze, conclude, smaSeries, redLineSeries, cciSeries, bollLowerSeries, findPivots, findSequencePoints, sequenceStructure, sequenceSellS1 };

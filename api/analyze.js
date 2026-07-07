@@ -48,7 +48,52 @@ function normalizeTicker(ticker, market) {
   return market === "TLV" ? `${s}.TA` : s;
 }
 
-async function fetchCandles(ticker, timeframe) {
+// ---------- entry-candle guard: drop a still-forming last bar ----------
+// The method's entry candle is the most recent CLOSED candle; it must never act
+// on a bar that is still forming (buy/sell skills are explicit). Yahoo's chart
+// endpoint returns an in-progress last bar during market hours (daily) or during
+// the current week/month (weekly/monthly), so we detect and drop it. `now` is
+// injectable (epoch seconds) so the logic is unit-testable without live time.
+
+// Calendar Y-M-D of an epoch-seconds instant, in the given exchange timezone.
+function ymdInTz(epochSec, tz) {
+  const f = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz || "UTC", year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  return f.format(new Date(epochSec * 1000)); // "YYYY-MM-DD"
+}
+// ISO-week key (e.g. "2026-W23") of an epoch-seconds instant, in the exchange tz.
+function isoWeekKeyInTz(epochSec, tz) {
+  const [y, m, d] = ymdInTz(epochSec, tz).split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const dayNum = (dt.getUTCDay() + 6) % 7;         // Mon=0 … Sun=6
+  dt.setUTCDate(dt.getUTCDate() - dayNum + 3);     // shift to the Thursday of this ISO week
+  const firstThu = new Date(Date.UTC(dt.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((dt - firstThu) / 86400000 - 3 + ((firstThu.getUTCDay() + 6) % 7)) / 7);
+  return `${dt.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+// True if the last returned bar's period has NOT closed yet, given Yahoo meta,
+// the bar's timestamp, the interval, and the current time (all epoch seconds).
+function isLastBarForming(meta, lastTs, interval, now) {
+  if (lastTs == null || now == null) return false;
+  const tz = meta?.exchangeTimezoneName || "UTC";
+  if (interval === "1d") {
+    // Daily: the bar is still forming only while its OWN session is open — it is
+    // today's session bar (same tz date as the current trading period) and the
+    // session close has not passed. After the close, today's bar is final.
+    const end = meta?.currentTradingPeriod?.regular?.end;
+    if (end == null) return ymdInTz(lastTs, tz) === ymdInTz(now, tz);
+    return ymdInTz(lastTs, tz) === ymdInTz(end, tz) && now < end;
+  }
+  // Weekly / monthly: an in-progress higher-timeframe bar is incomplete until the
+  // calendar period rolls over (same convention the Monthly Tracker uses).
+  if (interval === "1wk") return isoWeekKeyInTz(lastTs, tz) === isoWeekKeyInTz(now, tz);
+  if (interval === "1mo") return ymdInTz(lastTs, tz).slice(0, 7) === ymdInTz(now, tz).slice(0, 7);
+  return false;
+}
+
+async function fetchCandles(ticker, timeframe, { now = Date.now() / 1000 } = {}) {
   const tf = TIMEFRAMES[timeframe] || TIMEFRAMES.Daily;
   const url =
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}` +
@@ -79,6 +124,11 @@ async function fetchCandles(ticker, timeframe) {
     if ([open[i], high[i], low[i], close[i], volume[i]].some((x) => x == null)) continue;
     O.push(open[i]); H.push(high[i]); L.push(low[i]); C.push(close[i]); V.push(volume[i]); T.push(ts[i]);
   }
+  // Entry candle = most recent CLOSED bar: drop a still-forming last bar so the
+  // engine's `last` candle is always closed (per the method).
+  if (T.length && isLastBarForming(meta, T[T.length - 1], tf.interval, now)) {
+    O.pop(); H.pop(); L.pop(); C.pop(); V.pop(); T.pop();
+  }
   if (C.length < 30) throw new Error(`Only ${C.length} clean candles — need ~30+. Try a more liquid ticker.`);
 
   return {
@@ -91,7 +141,7 @@ async function fetchCandles(ticker, timeframe) {
   };
 }
 
-module.exports = async (req, res) => {
+const handler = async (req, res) => {
   res.setHeader("Cache-Control", "s-maxage=300"); // 5-min CDN cache
   try {
     const { ticker, timeframe, market, lang } = req.query || {};
@@ -137,3 +187,9 @@ module.exports = async (req, res) => {
     return res.status(502).json({ error: e.message || "Fetch/analysis failed" });
   }
 };
+
+module.exports = handler;
+// Exposed for unit tests (entry-candle guard, `now` injectable).
+module.exports.isLastBarForming = isLastBarForming;
+module.exports.ymdInTz = ymdInTz;
+module.exports.isoWeekKeyInTz = isoWeekKeyInTz;
