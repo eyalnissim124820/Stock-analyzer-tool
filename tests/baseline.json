@@ -42,12 +42,12 @@
     "P5": {
      "value": "na",
      "conf": "swing",
-     "why": "No falling sequence just broke"
+     "why": "Not enough swing lows to compare"
     },
     "Q1": {
      "value": "yes",
-     "conf": "swing",
-     "why": "Peaks 193.35→197.78, troughs 177.74→184.61"
+     "conf": "guess",
+     "why": "Sparse pivots — coarse half-vs-half structure check; confirm visually"
     },
     "Q2": {
      "value": "no",
@@ -109,6 +109,7 @@
     "aOk": false,
     "bOk": false,
     "cOk": true,
+    "q4Advisory": "yes",
     "allPass": false,
     "ratioOk": false
    },
@@ -129,7 +130,7 @@
       "price": 177.74
      },
      {
-      "i": 106,
+      "i": 103,
       "price": 184.61
      }
     ]
@@ -139,6 +140,9 @@
     "highestHighIdx": 85,
     "priorSeqLow": 177.74,
     "priorSeqLowIdx": 54,
+    "corrLow": 184.61,
+    "corrLowIdx": 103,
+    "corrBreakIdx": 114,
     "lastIdx": 139
    },
    "candles": {
@@ -1592,7 +1596,7 @@
       "label": "HH"
      },
      {
-      "i": 106,
+      "i": 103,
       "price": 184.61,
       "kind": "L",
       "label": "HL"
@@ -1695,19 +1699,19 @@
      "why": "Recent closes not strictly descending"
     },
     "P5": {
-     "value": "na",
+     "value": "yes",
      "conf": "swing",
-     "why": "No falling sequence just broke"
+     "why": "Latest swing low 171.81 vs previous 161.60"
     },
     "Q1": {
-     "value": "no",
+     "value": "yes",
      "conf": "swing",
-     "why": "Peaks 189.32→176.28, troughs 174.09→174.22"
+     "why": "Peaks 185.39→189.32, troughs 161.60→171.81"
     },
     "Q2": {
      "value": "no",
      "conf": "swing",
-     "why": "Avg vol rise ≈ 3,103,181 vs correction ≈ 3,363,036"
+     "why": "Avg vol rise ≈ 2,910,581 vs correction ≈ 3,363,036"
     },
     "Q3": {
      "value": "yes",
@@ -1732,7 +1736,7 @@
     "Q7": {
      "value": "no",
      "conf": "swing",
-     "why": "Prior sequence low 173.23; no full undercut"
+     "why": "Prior sequence low 171.81; no full undercut"
     },
     "Q8": {
      "value": "yes",
@@ -1759,11 +1763,12 @@
    },
    "conclusion": {
     "code": "DO_NOT_ENTER",
-    "firstFail": "Q1",
+    "firstFail": "Q2",
     "preOk": true,
     "aOk": false,
     "bOk": false,
     "cOk": true,
+    "q4Advisory": "yes",
     "allPass": false,
     "ratioOk": false
    },
@@ -1776,32 +1781,31 @@
      {
       "i": 84,
       "price": 189.32
-     },
-     {
-      "i": 115,
-      "price": 176.28
      }
     ],
     "pl": [
      {
-      "i": 51,
-      "price": 173.23
+      "i": 2,
+      "price": 161.6
      },
      {
-      "i": 112,
-      "price": 174.09
+      "i": 58,
+      "price": 171.81
      },
      {
-      "i": 116,
-      "price": 174.22
+      "i": 113,
+      "price": 173.7
      }
     ]
    },
    "segments": {
     "highestHigh": 189.32,
     "highestHighIdx": 84,
-    "priorSeqLow": 173.23,
-    "priorSeqLowIdx": 51,
+    "priorSeqLow": 171.81,
+    "priorSeqLowIdx": 58,
+    "corrLow": 173.7,
+    "corrLowIdx": 113,
+    "corrBreakIdx": 120,
     "lastIdx": 139
    },
    "candles": {
@@ -3237,16 +3241,22 @@
     },
     "points": [
      {
+      "i": 2,
+      "price": 161.6,
+      "kind": "L",
+      "label": "L"
+     },
+     {
       "i": 33,
       "price": 185.39,
       "kind": "H",
       "label": "H"
      },
      {
-      "i": 51,
-      "price": 173.23,
+      "i": 58,
+      "price": 171.81,
       "kind": "L",
-      "label": "L"
+      "label": "HL"
      },
      {
       "i": 84,
@@ -3255,84 +3265,63 @@
       "label": "HH"
      },
      {
-      "i": 112,
-      "price": 174.09,
-      "kind": "L",
-      "label": "HL"
-     },
-     {
-      "i": 115,
-      "price": 176.28,
-      "kind": "H",
-      "label": "LH"
-     },
-     {
-      "i": 116,
-      "price": 174.22,
+      "i": 113,
+      "price": 173.7,
       "kind": "L",
       "label": "HL"
      }
     ],
     "trend": {
      "trend": "uptrend",
-     "confidence": 0.75,
+     "confidence": 1,
      "reasons": [
-      "Last 4 swings: HH → HL → LH → HL",
+      "Last 3 swings: HL → HH → HL",
       "Rising highs and rising lows — buyers in control."
      ]
     },
-    "srLevels": [
-     {
-      "price": 173.8467,
-      "touches": 3,
-      "kind": "support",
-      "strength": 4,
-      "firstIdx": 51,
-      "lastIdx": 116
-     }
-    ],
+    "srLevels": [],
     "fib": {
      "from": {
-      "i": 51,
-      "price": 173.23,
+      "i": 2,
+      "price": 161.6,
       "kind": "L",
       "label": "L"
      },
      "to": {
-      "i": 84,
-      "price": 189.32,
+      "i": 33,
+      "price": 185.39,
       "kind": "H",
-      "label": "HH"
+      "label": "H"
      },
      "direction": "up",
      "levels": [
       {
        "ratio": 0,
-       "price": 189.32
+       "price": 185.39
       },
       {
        "ratio": 0.236,
-       "price": 185.5228
+       "price": 179.7756
       },
       {
        "ratio": 0.382,
-       "price": 183.1736
+       "price": 176.3022
       },
       {
        "ratio": 0.5,
-       "price": 181.275
+       "price": 173.495
       },
       {
        "ratio": 0.618,
-       "price": 179.3764
+       "price": 170.6878
       },
       {
        "ratio": 0.786,
-       "price": 176.6733
+       "price": 166.6911
       },
       {
        "ratio": 1,
-       "price": 173.23
+       "price": 161.6
       }
      ]
     }
@@ -3381,24 +3370,24 @@
      "why": "הסגירות האחרונות אינן בירידה רציפה"
     },
     "P5": {
-     "value": "na",
+     "value": "yes",
      "conf": "swing",
-     "why": "לא נשבר לאחרונה רצף יורד"
+     "why": "שפל אחרון 60.18 מול השפל הקודם 58.07"
     },
     "Q1": {
      "value": "no",
      "conf": "swing",
-     "why": "פסגות 77.07→63.23, שפלים 60.18→57.58"
+     "why": "פסגות 77.07→63.23, שפלים 58.07→60.18"
     },
     "Q2": {
      "value": "yes",
      "conf": "swing",
-     "why": "מחזור ממוצע בעלייה ≈ 4,035,488 מול בתיקון ≈ 3,370,584"
+     "why": "מחזור ממוצע בעלייה ≈ 3,907,778 מול בתיקון ≈ 2,946,976"
     },
     "Q3": {
-     "value": "yes",
+     "value": "no",
      "conf": "exact",
-     "why": "הקו הירוק (SMA 13) עולה, האדום (SMA 5) מתחת לירוק"
+     "why": "הקו הירוק (SMA 13) שטוח/יורד, האדום (SMA 5) מעל לירוק"
     },
     "Q4": {
      "value": "yes",
@@ -3413,12 +3402,12 @@
     "Q6": {
      "value": "yes",
      "conf": "exact",
-     "why": "CCI(5) מינימלי בתיקון ≈ -145 (נדרש < ‎−100)"
+     "why": "CCI(5) מינימלי בתיקון ≈ -135 (נדרש < ‎−100)"
     },
     "Q7": {
-     "value": "no",
+     "value": "yes",
      "conf": "swing",
-     "why": "שפל הרצף הקודם 58.07; אין חדירה מלאה מתחתיו"
+     "why": "שפל הרצף הקודם 60.18; נר ירד כולו מתחתיו"
     },
     "Q8": {
      "value": "yes",
@@ -3434,11 +3423,11 @@
    "math": {
     "buy": 75.17,
     "candleLow": 73.16,
-    "highestHigh": 77.07,
+    "highestHigh": 63.23,
     "risk": 4.01090860715712,
-    "reward": 2.527604097379262,
-    "ratio": 0.630182421227193,
-    "maxBuy": 57.480000000000004,
+    "reward": -15.883996275109757,
+    "ratio": -3.9601990049751166,
+    "maxBuy": 53.22153846153846,
     "triggeredK": [
      "K2"
     ]
@@ -3450,6 +3439,7 @@
     "aOk": false,
     "bOk": false,
     "cOk": true,
+    "q4Advisory": "yes",
     "allPass": false,
     "ratioOk": false
    },
@@ -3484,10 +3474,13 @@
     ]
    },
    "segments": {
-    "highestHigh": 77.07,
-    "highestHighIdx": 82,
-    "priorSeqLow": 58.07,
-    "priorSeqLowIdx": 61,
+    "highestHigh": 63.23,
+    "highestHighIdx": 108,
+    "priorSeqLow": 60.18,
+    "priorSeqLowIdx": 106,
+    "corrLow": 57.58,
+    "corrLowIdx": 113,
+    "corrBreakIdx": 118,
     "lastIdx": 139
    },
    "candles": {
@@ -5066,9 +5059,9 @@
      "why": "Recent closes not strictly descending"
     },
     "P5": {
-     "value": "na",
+     "value": "yes",
      "conf": "swing",
-     "why": "No falling sequence just broke"
+     "why": "Latest swing low 125.62 vs previous 122.95"
     },
     "Q1": {
      "value": "yes",
@@ -5135,6 +5128,7 @@
     "aOk": true,
     "bOk": false,
     "cOk": true,
+    "q4Advisory": "yes",
     "allPass": false,
     "ratioOk": false
    },
@@ -5155,6 +5149,10 @@
     ],
     "pl": [
      {
+      "i": 1,
+      "price": 115.36
+     },
+     {
       "i": 58,
       "price": 122.95
      },
@@ -5169,6 +5167,9 @@
     "highestHighIdx": 138,
     "priorSeqLow": 125.62,
     "priorSeqLowIdx": 106,
+    "corrLow": null,
+    "corrLowIdx": null,
+    "corrBreakIdx": null,
     "lastIdx": 139
    },
    "candles": {
@@ -6604,6 +6605,12 @@
     },
     "points": [
      {
+      "i": 1,
+      "price": 115.36,
+      "kind": "L",
+      "label": "L"
+     },
+     {
       "i": 30,
       "price": 140.72,
       "kind": "H",
@@ -6613,7 +6620,7 @@
       "i": 58,
       "price": 122.95,
       "kind": "L",
-      "label": "L"
+      "label": "HL"
      },
      {
       "i": 85,
@@ -6636,55 +6643,55 @@
     ],
     "trend": {
      "trend": "uptrend",
-     "confidence": 0.67,
+     "confidence": 0.75,
      "reasons": [
-      "Last 3 swings: LH → HL → HH",
+      "Last 4 swings: HL → LH → HL → HH",
       "Rising highs and rising lows — buyers in control."
      ]
     },
     "srLevels": [],
     "fib": {
      "from": {
-      "i": 106,
-      "price": 125.62,
+      "i": 1,
+      "price": 115.36,
       "kind": "L",
-      "label": "HL"
+      "label": "L"
      },
      "to": {
-      "i": 138,
-      "price": 146.29,
+      "i": 30,
+      "price": 140.72,
       "kind": "H",
-      "label": "HH"
+      "label": "H"
      },
      "direction": "up",
      "levels": [
       {
        "ratio": 0,
-       "price": 146.29
+       "price": 140.72
       },
       {
        "ratio": 0.236,
-       "price": 141.4119
+       "price": 134.735
       },
       {
        "ratio": 0.382,
-       "price": 138.3941
+       "price": 131.0325
       },
       {
        "ratio": 0.5,
-       "price": 135.955
+       "price": 128.04
       },
       {
        "ratio": 0.618,
-       "price": 133.5159
+       "price": 125.0475
       },
       {
        "ratio": 0.786,
-       "price": 130.0434
+       "price": 120.787
       },
       {
        "ratio": 1,
-       "price": 125.62
+       "price": 115.36
       }
      ]
     }
@@ -6835,6 +6842,10 @@
      }
     ],
     "pl": [
+     {
+      "i": 2,
+      "price": 195.44
+     },
      {
       "i": 58,
       "price": 201.55
@@ -8702,8 +8713,16 @@
    "pivots": {
     "ph": [
      {
+      "i": 1,
+      "price": 73.33
+     },
+     {
       "i": 28,
       "price": 93.91
+     },
+     {
+      "i": 53,
+      "price": 86.89
      },
      {
       "i": 82,
@@ -8716,8 +8735,16 @@
     ],
     "pl": [
      {
+      "i": 3,
+      "price": 71.05
+     },
+     {
       "i": 48,
       "price": 82.9
+     },
+     {
+      "i": 57,
+      "price": 84.21
      },
      {
       "i": 84,
@@ -10605,8 +10632,8 @@
     ],
     "pl": [
      {
-      "i": 3,
-      "price": 125.26
+      "i": 4,
+      "price": 125.23
      },
      {
       "i": 55,
@@ -12381,7 +12408,7 @@
     "S1": {
      "value": "yes",
      "conf": "swing",
-     "why": "Peaks 200.26→210.79, troughs 186.29→191.41 (sequence points)"
+     "why": "Peaks 200.26→210.79, troughs 186.09→191.41 (sequence points)"
     },
     "S2": {
      "value": "no",
@@ -12487,8 +12514,12 @@
     ],
     "pl": [
      {
-      "i": 57,
-      "price": 197.89
+      "i": 1,
+      "price": 195.67
+     },
+     {
+      "i": 58,
+      "price": 197.61
      },
      {
       "i": 88,
