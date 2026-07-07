@@ -18,7 +18,16 @@
 //
 // Per the 3-second rule, borderline results FAIL (never round up to a pass)
 // and are surfaced at low confidence.
+//
+// Peaks/troughs come from the shared sequence engine (findSequencePoints in
+// _engine.js): a peak forms when a rising sequence breaks and is the highest
+// bar's HIGH; a trough when a falling sequence breaks and is the lowest bar's
+// LOW. This supersedes the checklist's "closing basis" note for S1/S4 — a
+// deliberate product decision to use one peak/trough definition everywhere.
 // ─────────────────────────────────────────────────────────────
+
+const { findSequencePoints } = require("./_engine.js");
+const { zigzagSequence } = require("./_peaks.js");
 
 // ---------- localized "why" messages ----------
 // Math/figures are language-agnostic; only the human-readable line is localized.
@@ -28,14 +37,14 @@ const MSG = {
     M1falling: () => `Leading index falling/topping — per-stock buys are void`,
     M1mixed: () => `Leading index mixed — proceed with caution (pointwise only)`,
     M1unknown: () => `Could not read the market index — confirm the broad market yourself`,
-    S1: (p0, p1, t0, t1) => `Peaks ${p0}→${p1}, troughs ${t0}→${t1} (closing basis)`,
+    S1: (p0, p1, t0, t1) => `Peaks ${p0}→${p1}, troughs ${t0}→${t1} (sequence points)`,
     S1sparse: () => `Sparse pivots — coarse half-vs-half structure; confirm visually`,
     S2: (a, b) => `Volume MA now ≈ ${a} vs prior ≈ ${b}`,
     S3a: (s, l, ok) => `MA20 ${s} ${ok ? ">" : "≤"} MA40 ${l}`,
     S3b: (now, prev, ok) => `MA40 slope ${now} vs prior ${prev} → ${ok ? "rising, not flattening" : "flattening/declining"}`,
     S3c: (now, prev, ok) => `MA20–MA40 gap ${now} vs prior ${prev} → ${ok ? "widening/equal" : "contracting"}`,
-    S4yes: (lv) => `Broken resistance ≈ ${lv} now holding as support (closing basis)`,
-    S4no: () => `No broken-resistance-turned-support found on closes`,
+    S4yes: (lv) => `Broken resistance ≈ ${lv} now holding as support`,
+    S4no: () => `No broken-resistance-turned-support found`,
     G1: (a, b, ok) => `MA5 ${a} ${ok ? ">" : "≤"} MA20 ${b} — order ${ok ? "kept" : "broken"} through the correction`,
     C1: (below, down) => `Falling sequence ${below ? "below" : "not below"} MA5; MA5 ${down ? "sloping down" : "not down"}`,
     C2: (m, fresh) => `Min CCI(5) ≈ ${m ?? "n/a"} (need ≤ −100); ${fresh ? "fresh (≤~3 candles)" : "stale oversold"}`,
@@ -48,14 +57,14 @@ const MSG = {
     M1falling: () => `מדד מוביל יורד/טופ — קניות פר-מנייה בטלות`,
     M1mixed: () => `מדד מוביל מעורב — בזהירות בלבד (נקודתית)`,
     M1unknown: () => `לא ניתן לקרוא את מדד השוק — אמתו את השוק הרחב בעצמכם`,
-    S1: (p0, p1, t0, t1) => `פסגות ${p0}→${p1}, שפלים ${t0}→${t1} (בסיס סגירה)`,
+    S1: (p0, p1, t0, t1) => `פסגות ${p0}→${p1}, שפלים ${t0}→${t1} (נקודות רצף)`,
     S1sparse: () => `מעט נקודות מפנה — בדיקת מבנה גסה; ודאו ויזואלית`,
     S2: (a, b) => `MA על המחזור עכשיו ≈ ${a} מול קודם ≈ ${b}`,
     S3a: (s, l, ok) => `MA20 ${s} ${ok ? ">" : "≤"} MA40 ${l}`,
     S3b: (now, prev, ok) => `שיפוע MA40 ${now} מול קודם ${prev} ← ${ok ? "עולה, לא מתיישר" : "מתיישר/יורד"}`,
     S3c: (now, prev, ok) => `מרווח MA20–MA40 ${now} מול קודם ${prev} ← ${ok ? "מתרחב/זהה" : "מתכווץ"}`,
-    S4yes: (lv) => `התנגדות שנפרצה ≈ ${lv} מחזיקה כעת כתמיכה (בסיס סגירה)`,
-    S4no: () => `לא נמצאה התנגדות-שהפכה-לתמיכה על סגירות`,
+    S4yes: (lv) => `התנגדות שנפרצה ≈ ${lv} מחזיקה כעת כתמיכה`,
+    S4no: () => `לא נמצאה התנגדות-שהפכה-לתמיכה`,
     G1: (a, b, ok) => `MA5 ${a} ${ok ? ">" : "≤"} MA20 ${b} — הסדר ${ok ? "נשמר" : "נשבר"} לאורך התיקון`,
     C1: (below, down) => `הרצף היורד ${below ? "מתחת" : "לא מתחת"} ל-MA5; MA5 ${down ? "במגמת ירידה" : "אינו יורד"}`,
     C2: (m, fresh) => `CCI(5) מינ׳ ≈ ${m ?? "אין"} (נדרש ≤ ‎−100); ${fresh ? "טרי (≤~3 נרות)" : "אובר-סולד ישן"}`,
@@ -121,8 +130,9 @@ function candleAt(c, i) {
 // "Seller candle": small body low, upper tail ≥ 2× body (sellers regaining control).
 const isSeller = (k) => k.upper >= 2 * k.body && k.body > 0;
 
-// ---------- pivots on a CLOSING basis ----------
-// Spec: S1/S4 peaks, troughs, S/R are computed on CLOSE prices, not highs/lows.
+// ---------- pivots on a CLOSING basis — LEGACY ----------
+// Retained only as a fallback for degenerate inputs (< 3 bars); the default
+// detection path is findSequencePoints from _engine.js.
 // A pivot high at i: close[i] ≥ the n closes before and > the n after (mirror low).
 function findPivotsClose(closes, n = 2) {
   const ph = [], pl = [];
@@ -147,8 +157,8 @@ function segments(c, pivots) {
   // Most recent peak = the high the current correction came down from ("prior peak").
   let peak = ph.length ? ph[ph.length - 1] : null;
   if (!peak) {
-    const idx = c.close.indexOf(Math.max(...c.close));
-    peak = { i: idx, price: c.close[idx] };
+    const idx = c.high.indexOf(Math.max(...c.high));
+    peak = { i: idx, price: c.high[idx] };
   }
   // Prior resistance = the peak BEFORE that one (quality-gate reference + S4 level).
   const priorPeak = ph.length >= 2 ? ph[ph.length - 2] : null;
@@ -159,7 +169,7 @@ function segments(c, pivots) {
   if (!riseLow && peak.i > 0) {
     const start = Math.max(0, peak.i - 20);
     let lo = Infinity, idx = start;
-    for (let i = start; i < peak.i; i++) if (c.close[i] < lo) { lo = c.close[i]; idx = i; }
+    for (let i = start; i < peak.i; i++) if (c.low[i] < lo) { lo = c.low[i]; idx = i; }
     if (isFinite(lo)) riseLow = { i: idx, price: lo };
   }
 
@@ -194,7 +204,9 @@ function analyze({ candlesByTf, timeframe, technique = 1, swingN = 2, market, la
     const volMa = smaSeries(c.volume, 5);                  // "short MA of volume"
     const cci = cciSeries(c.high, c.low, c.close, 5);
     const boll = bollSeries(c.close, 10, 1);
-    const pivots = findPivotsClose(c.close, swingN);
+    const pivots = c.close.length < 3
+      ? findPivotsClose(c.close, swingN)
+      : findSequencePoints(c.open, c.high, c.low, c.close);
     const seg = segments(c, pivots);
     return { c, ma5, ma20, ma40, volMa, cci, boll, pivots, seg };
   };
@@ -264,7 +276,7 @@ function analyze({ candlesByTf, timeframe, technique = 1, swingN = 2, market, la
   // Technique 1: multi-timeframe cascade → trade horizon + timeframe.
   // The level where a falling sequence appears sets the horizon.
   const cascade = tech === 1
-    ? runCascade(candlesByTf, swingN)
+    ? runCascade(candlesByTf)
     : { horizon: TF_HORIZON[timeframe], tradeTf: timeframe, reason: "single" };
   const tradeTf = cascade.tradeTf;
   const TR = tradeTf && candlesByTf[tradeTf] ? build(candlesByTf[tradeTf]) : S; // Steps 3/4 run on the trade timeframe
@@ -363,21 +375,19 @@ function analyze({ candlesByTf, timeframe, technique = 1, swingN = 2, market, la
 // horizon label for a single timeframe (Technique 2)
 const TF_HORIZON = { Monthly: "long", Weekly: "medium", Daily: "short" };
 
-// Does a falling sequence (down-move from the most recent peak) currently exist?
-// True when the latest close sits below the most recent close-pivot high and the
-// move down spans ≥2 candles — i.e. an active correction off the peak.
-function hasFallingSequence(c, swingN) {
-  const piv = findPivotsClose(c.close, swingN);
-  const seg = segments(c, piv);
-  const last = c.close.length - 1;
-  if (seg.peak == null) return false;
-  const span = last - seg.peak.i;
-  return span >= 2 && c.close[last] < seg.peak.price;
+// Does a falling sequence currently exist on this timeframe?
+// Answered by the sequence engine itself: zigzagSequence's trailing
+// provisional point is the running (not-yet-broken) sequence's extreme — a
+// provisional trough means the chart is inside an active falling sequence.
+function hasFallingSequence(c) {
+  const pts = zigzagSequence(c);
+  const last = pts[pts.length - 1];
+  return !!(last && last.provisional && last.kind === "L");
 }
 
 // Technique 1 cascade: monthly → weekly → daily. The level where a falling
 // sequence appears sets the trade horizon/timeframe. (Spec STEP 2, Technique 1.)
-function runCascade(byTf, swingN) {
+function runCascade(byTf) {
   const steps = [
     ["Monthly", "long"],
     ["Weekly", "medium"],
@@ -385,7 +395,7 @@ function runCascade(byTf, swingN) {
   ];
   for (const [tf, horizon] of steps) {
     const c = byTf[tf];
-    if (c && hasFallingSequence(c, swingN)) return { horizon, tradeTf: tf, reason: "falling-sequence" };
+    if (c && hasFallingSequence(c)) return { horizon, tradeTf: tf, reason: "falling-sequence" };
   }
   // No falling sequence anywhere ⇒ drop to the daily and look for the break there
   // (short-term). If daily exists, trade it; otherwise no valid setup.
@@ -393,9 +403,9 @@ function runCascade(byTf, swingN) {
   return { horizon: "none", tradeTf: null, reason: "no-setup" };
 }
 
-// last broken resistance now acting as support, on closing basis. Uses pivot
-// highs as candidate resistances: a level that closes broke ABOVE and which a
-// later pullback close held at/above (within tolerance).
+// last broken resistance now acting as support. Uses sequence-peak highs as
+// candidate resistances: a level that closes broke ABOVE and which a later
+// pullback close held at/above (within tolerance).
 function s4Support(closes, pivots) {
   const { ph } = pivots;
   const last = closes.length - 1;
