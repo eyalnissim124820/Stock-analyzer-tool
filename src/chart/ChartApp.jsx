@@ -39,7 +39,7 @@ export default function ChartApp({ lang = "en", initial = null }) {
   const [symbol, setSymbol] = useState("");
   const [barInterval, setBarInterval] = useState("1d"); // "1d" (daily) | "1wk" (weekly)
   const [range, setRange] = useState("1Y");
-  const [zigzagMode, setZigzagMode] = useState("percent");
+  const [zigzagMode, setZigzagMode] = useState("sequence");
   const [sensitivity, setSensitivity] = useState(5);
   const [ind, setInd] = useState(loadIndicators);
   const [showWhy, setShowWhy] = useState(false);
@@ -161,12 +161,19 @@ export default function ChartApp({ lang = "en", initial = null }) {
 
         {/* Structure controls + trend verdict */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, background: C.card, borderRadius: 24, boxShadow: INSET, padding: "12px 18px", flexWrap: "wrap" }}>
-          <span style={{ font: `700 13px ${font}`, color: C.t70, whiteSpace: "nowrap" }} title={t.sensitivityHelp}>{t.sensitivity}</span>
-          <input type="range" min={1} max={10} value={sensitivity} onChange={(e) => onSensitivity(+e.target.value)}
-            style={{ flex: 1, minWidth: 120, accentColor: C.amber }} />
-          <span style={{ font: `700 15px ${font}`, color: "#fff", minWidth: 18, textAlign: "center" }}>{sensitivity}</span>
+          {zigzagMode === "sequence" ? (
+            /* Sequence mode is parameter-free — a break either happened or it didn't. */
+            <span style={{ flex: 1, minWidth: 120, font: `400 12px ${font}`, color: C.t50 }}>{t.sequenceHint}</span>
+          ) : (
+            <>
+              <span style={{ font: `700 13px ${font}`, color: C.t70, whiteSpace: "nowrap" }} title={t.sensitivityHelp}>{t.sensitivity}</span>
+              <input type="range" min={1} max={10} value={sensitivity} onChange={(e) => onSensitivity(+e.target.value)}
+                style={{ flex: 1, minWidth: 120, accentColor: C.amber }} />
+              <span style={{ font: `700 15px ${font}`, color: "#fff", minWidth: 18, textAlign: "center" }}>{sensitivity}</span>
+            </>
+          )}
           <div style={{ display: "flex", gap: 2, background: C.sub, borderRadius: 40, padding: 4 }}>
-            {["percent", "lookback"].map((m) => (
+            {["sequence", "percent", "lookback"].map((m) => (
               <button key={m} onClick={() => onZigzagMode(m)} style={pill(zigzagMode === m)}>{t.zigzagMode[m]}</button>
             ))}
           </div>

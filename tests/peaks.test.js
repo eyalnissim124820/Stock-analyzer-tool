@@ -9,7 +9,7 @@
 const assert = require("assert");
 const { installFetchStub, runHandler, yahooChartFixture } = require("./_mock.js");
 const {
-  atrSeries, zigzag, zigzagPercent, zigzagLookback,
+  atrSeries, zigzag, zigzagPercent, zigzagLookback, zigzagSequence,
   classifySwings, trendVerdict, srLevels, fibLevels, analyzePeaks,
 } = require("../api/_peaks.js");
 
@@ -86,6 +86,38 @@ const alternates = (pts) => pts.every((p, i) => i === 0 || p.kind !== pts[i - 1]
     const c = line([100, 110, 100, 112]);
     assert.deepStrictEqual(zigzag(c, PCT), zigzagPercent(c, PCT));
     assert.deepStrictEqual(zigzag(c, { mode: "lookback", lookback: 2 }), zigzagLookback(c, { lookback: 2 }));
+    assert.deepStrictEqual(zigzag(c, { mode: "sequence" }), zigzagSequence(c));
+  });
+
+  // ── zigzag: sequence mode (the course method) ──
+  await test("sequence mode: peak confirmed on rising-sequence break, at the run's highest bar", () => {
+    // Rising run tops at bar 3 (high 13.2, low 12.8); bar 4 dips but closes
+    // above bar 3's low (sequence intact); bar 5 closes below it → break.
+    const c = {
+      open:  [9.9, 10.9, 11.9, 12.9, 12.95, 11.4],
+      high:  [10.2, 11.2, 12.2, 13.2, 13.0, 11.2],
+      low:   [9.8, 10.8, 11.8, 12.8, 12.6, 10.8],
+      close: [10, 11, 12, 13, 12.9, 11],
+      volume: Array(6).fill(1e6),
+    };
+    const pts = zigzagSequence(c);
+    const confirmed = pts.filter((p) => !p.provisional);
+    assert.strictEqual(confirmed.length, 1, `expected 1 confirmed point, got ${kinds(confirmed)}`);
+    assert.deepStrictEqual(confirmed[0], { i: 3, price: 13.2, kind: "H" });
+    // The running falling sequence's low is provisional, and points alternate.
+    const last = pts[pts.length - 1];
+    assert.strictEqual(last.kind, "L");
+    assert.strictEqual(last.provisional, true);
+    assert.ok(alternates(pts), `must alternate, got ${kinds(pts)}`);
+  });
+
+  await test("sequence mode flows through analyzePeaks with parameter-free params", () => {
+    const c = line([100, 110, 105, 118, 112, 126, 120, 134]);
+    const a = analyzePeaks(c, { mode: "sequence" });
+    assert.strictEqual(a.params.mode, "sequence");
+    assert.ok(alternates(a.points), `must alternate, got ${kinds(a.points)}`);
+    assert.ok(a.points.filter((p) => !p.provisional).length >= 4, "staircase should confirm several points");
+    assert.strictEqual(trendVerdict(a.points).trend, "uptrend");
   });
 
   // ── sensitivity monotonicity ──

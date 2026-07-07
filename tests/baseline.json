@@ -14435,8 +14435,8 @@
    "range": "1Y",
    "interval": "1d",
    "params": {
-    "zigzagMode": "percent",
-    "sensitivity": 5
+    "zigzagMode": "sequence",
+    "sensitivity": null
    },
    "candles": {
     "open": [
@@ -17576,18 +17576,12 @@
    },
    "peaks": {
     "params": {
-     "mode": "percent",
-     "reversalPct": 2.28,
-     "atrMult": 0.5,
+     "mode": "sequence",
+     "reversalPct": null,
+     "atrMult": null,
      "lookback": null
     },
     "points": [
-     {
-      "i": 2,
-      "price": 195.44,
-      "kind": "L",
-      "label": "L"
-     },
      {
       "i": 28,
       "price": 213.13,
@@ -17598,7 +17592,7 @@
       "i": 58,
       "price": 201.55,
       "kind": "L",
-      "label": "HL"
+      "label": "L"
      },
      {
       "i": 76,
@@ -17622,22 +17616,13 @@
     ],
     "trend": {
      "trend": "uptrend",
-     "confidence": 0.75,
+     "confidence": 0.67,
      "reasons": [
-      "Last 4 swings: HL → HH → LL → HH",
+      "Last 3 swings: HH → LL → HH",
       "Rising highs and rising lows — buyers in control."
      ]
     },
-    "srLevels": [
-     {
-      "price": 195.56,
-      "touches": 2,
-      "kind": "support",
-      "strength": 3,
-      "firstIdx": 2,
-      "lastIdx": 111
-     }
-    ],
+    "srLevels": [],
     "fib": {
      "from": {
       "i": 76,
