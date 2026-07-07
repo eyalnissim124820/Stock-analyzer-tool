@@ -3,7 +3,10 @@
 //
 // Pure math, no I/O. Generalizes the n-bar pivot idea in api/_engine.js
 // (findPivots) into a full structure toolkit:
-//   • zigzag()        — alternating swing highs/lows, two detection modes:
+//   • zigzag()        — alternating swing highs/lows, three detection modes:
+//       "sequence" : the course method — a peak appears when a rising sequence
+//                    breaks, a trough when a falling sequence breaks (same
+//                    definition as findSequencePoints in _engine.js).
 //       "percent"  : classic reversal ZigZag — a swing turns only after price
 //                    retraces max(reversalPct%, atrMult×ATR14) from the extreme.
 //       "lookback" : n-bar pivots (same strict/non-strict rule as findPivots)
@@ -132,9 +135,53 @@ function zigzagLookback(candles, { lookback = 2 } = {}) {
   return pts;
 }
 
+// ── sequence-break ZigZag (the course method) ──
+// A peak (שיא) forms when a RISING sequence breaks — a bar closes below the
+// low of the highest bar in the run; a trough (שפל) when a FALLING sequence
+// breaks — a close above the high of the lowest bar. Same state machine as
+// findSequencePoints in api/_engine.js (Session 02/03 definition; keep the two
+// in sync), but emits merged alternating points and flags the still-running
+// sequence's extreme `provisional` so the UI can draw its leg dashed.
+function zigzagSequence(candles) {
+  const { high, low, close } = candles;
+  const n = close.length;
+  const pts = [];
+  if (n < 2) return pts;
+  let dir = 0;                 // +1 rising, -1 falling, 0 unset
+  let extremeIdx = 0;          // highest bar (rising) or lowest bar (falling)
+  for (let i = 1; i < n; i++) {
+    if (dir >= 0 && close[i] > low[i - 1]) {
+      dir = 1;
+      if (high[i] >= high[extremeIdx]) extremeIdx = i;
+      continue;
+    }
+    if (dir === 1 && close[i] < low[extremeIdx]) {
+      pts.push({ i: extremeIdx, price: high[extremeIdx], kind: "H" });
+      dir = -1; extremeIdx = i;
+      continue;
+    }
+    if (dir <= 0 && close[i] < high[i - 1]) {
+      dir = -1;
+      if (low[i] <= low[extremeIdx]) extremeIdx = i;
+      continue;
+    }
+    if (dir === -1 && close[i] > high[extremeIdx]) {
+      pts.push({ i: extremeIdx, price: low[extremeIdx], kind: "L" });
+      dir = 1; extremeIdx = i;
+      continue;
+    }
+    if (dir === 1 && high[i] >= high[extremeIdx]) extremeIdx = i;
+    if (dir === -1 && low[i] <= low[extremeIdx]) extremeIdx = i;
+  }
+  // The running sequence hasn't broken yet — its extreme is not a confirmed point.
+  if (dir === 1) pts.push({ i: extremeIdx, price: high[extremeIdx], kind: "H", provisional: true });
+  else if (dir === -1) pts.push({ i: extremeIdx, price: low[extremeIdx], kind: "L", provisional: true });
+  return pts;
+}
+
 function zigzag(candles, opts = {}) {
-  const mode = opts.mode === "lookback" ? "lookback" : "percent";
-  return mode === "lookback" ? zigzagLookback(candles, opts) : zigzagPercent(candles, opts);
+  if (opts.mode === "sequence") return zigzagSequence(candles);
+  return opts.mode === "lookback" ? zigzagLookback(candles, opts) : zigzagPercent(candles, opts);
 }
 
 // ── HH / HL / LH / LL vs the previous swing of the same kind ──
@@ -248,7 +295,7 @@ function analyzePeaks(candles, opts = {}) {
   const fib = fibLevels(points);
   return {
     params: {
-      mode: opts.mode === "lookback" ? "lookback" : "percent",
+      mode: ["lookback", "sequence"].includes(opts.mode) ? opts.mode : "percent",
       reversalPct: opts.reversalPct ?? null,
       atrMult: opts.atrMult ?? null,
       lookback: opts.lookback ?? null,
@@ -265,6 +312,7 @@ module.exports = {
   zigzag,
   zigzagPercent,
   zigzagLookback,
+  zigzagSequence,
   classifySwings,
   trendVerdict,
   srLevels,
