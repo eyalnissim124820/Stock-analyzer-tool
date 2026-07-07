@@ -45,7 +45,7 @@ function tapePayload() {
 }
 
 (async () => {
-  const calls = installFetchStub((url) => (url.includes("TAPE.TA") ? tapePayload() : undefined));
+  let calls = installFetchStub((url) => (url.includes("TAPE.TA") ? tapePayload() : undefined));
 
   await test("TASE weekly bars are Sunday→Thursday aggregates of the dailies", async () => {
     const d = await fetchRaw("TAPE.TA", "1wk", "1mo", { minBars: 2 });
@@ -75,6 +75,36 @@ function tapePayload() {
       { o: c.open[0], h: c.high[0], l: c.low[0], cl: c.close[0], v: c.volume[0], date: d.dates[0] },
       { o: 100, h: 113, l: 98, cl: 112, v: 280, date: "2026-06-22" }
     );
+  });
+
+  await test("midnight-stamped sessions still group into their own Israeli week", async () => {
+    // Yahoo stamps some daily bars at LOCAL midnight — the previous evening in
+    // UTC (00:00 IDT = 21:00 UTC the day before) — and the live bar at quote
+    // time. A UTC-date week key misfiles the Sunday session into the previous
+    // week (the "split candle" bug); the Israel-calendar key must not.
+    const MID = (y, mo, d) => Date.UTC(y, mo - 1, d, 21) / 1000 - 86400; // 00:00 IDT of that day
+    const tape2 = {
+      ...tapePayload(),
+    };
+    tape2.chart.result[0].timestamp = [
+      MID(2026, 6, 14), MID(2026, 6, 15), MID(2026, 6, 16), MID(2026, 6, 17), MID(2026, 6, 18),
+      MID(2026, 6, 21),
+      Date.UTC(2026, 5, 22, 11, 4) / 1000, // live Mon 22/06 bar stamped at quote time
+    ];
+    const calls2 = installFetchStub((url) => (url.includes("MIDTAPE.TA") ? tape2 : undefined));
+    const d = await fetchRaw("MIDTAPE.TA", "1wk", "1mo", { minBars: 2 });
+    assert.ok(calls2[calls2.length - 1].includes("interval=1d"));
+    const c = d.candles;
+    assert.strictEqual(c.close.length, 2, `expected 2 weekly bars, got ${c.close.length} (${d.dates})`);
+    assert.deepStrictEqual(
+      { o: c.open[0], h: c.high[0], l: c.low[0], cl: c.close[0], v: c.volume[0], date: d.dates[0] },
+      { o: 100, h: 110, l: 98, cl: 109, v: 150, date: "2026-06-18" }
+    );
+    assert.deepStrictEqual(
+      { o: c.open[1], h: c.high[1], l: c.low[1], cl: c.close[1], v: c.volume[1], date: d.dates[1] },
+      { o: 109, h: 113, l: 108, cl: 112, v: 130, date: "2026-06-22" }
+    );
+    calls = installFetchStub((url) => (url.includes("TAPE.TA") ? tapePayload() : undefined)); // restore
   });
 
   await test("TASE daily fetch is untouched (no aggregation)", async () => {

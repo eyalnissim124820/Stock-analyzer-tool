@@ -37,11 +37,24 @@ function normalizeTicker(ticker, market) {
 // date), months are calendar months. TASE session timestamps are session-start
 // in Asia/Jerusalem (UTC+2/+3), so the UTC date of the timestamp IS the local
 // trading date — no further tz math needed.
-const DAY = 86400;
+// Trading date of a bar, in Israel's calendar. Yahoo stamps daily bars
+// inconsistently across exchanges — session open for some, local MIDNIGHT
+// (which is the previous evening in UTC: 00:00 IDT = 21:00 UTC the day
+// before) for others, and the live quote time for the current day's bar.
+// Deriving the date from the UTC timestamp misfiles a midnight-stamped
+// Sunday session into the previous Israeli week — the prior weekly candle
+// swallows Sunday and the current week shows as a separate Mon–Thu stub.
+// The Asia/Jerusalem calendar date is correct under every convention.
+const IL_DATE = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit",
+});
+function taseDate(ts) { return IL_DATE.format(new Date(ts * 1000)); } // "YYYY-MM-DD"
+
 function taseGroupKey(ts, interval) {
-  const d = new Date(ts * 1000);
-  if (interval === "1mo") return d.getUTCFullYear() * 12 + d.getUTCMonth();
-  return Math.floor(ts / DAY) - d.getUTCDay(); // day-number of the week's Sunday
+  const [y, m, d] = taseDate(ts).split("-").map(Number);
+  if (interval === "1mo") return y * 12 + (m - 1);
+  const local = new Date(Date.UTC(y, m - 1, d));
+  return Math.floor(local.getTime() / 86400000) - local.getUTCDay(); // day-number of the week's Sunday
 }
 
 // Aggregate cleaned daily candles into Israeli weekly/monthly bars. Each bar:
@@ -108,7 +121,8 @@ async function fetchYahoo(ticker, interval, range) {
 // at 1wk/1mo the bars are built from dailies on the Israeli calendar (above);
 // everything else takes Yahoo's own bars unchanged.
 async function fetchRaw(ticker, interval, range, { minBars = 30 } = {}) {
-  const tase = /\.TA$/i.test(ticker) && (interval === "1wk" || interval === "1mo");
+  const isTa = /\.TA$/i.test(ticker);
+  const tase = isTa && (interval === "1wk" || interval === "1mo");
   const raw = await fetchYahoo(ticker, tase ? "1d" : interval, range);
   const { candles, T } = tase ? aggregateTaseCandles(raw.candles, raw.T, interval) : raw;
   const meta = raw.meta;
@@ -116,10 +130,13 @@ async function fetchRaw(ticker, interval, range, { minBars = 30 } = {}) {
     throw new Error(`Only ${candles.close.length} clean candles — need ~${minBars}+. Try a more liquid ticker.`);
   }
 
+  // .TA bars are dated on the Israeli calendar (see taseDate) so a session
+  // stamped at local midnight still labels as its own trading day.
+  const dateOf = isTa ? taseDate : (t) => new Date(t * 1000).toISOString().slice(0, 10);
   return {
     candles,
-    dates: T.map((t) => new Date(t * 1000).toISOString().slice(0, 10)),
-    lastDate: T.length ? new Date(T[T.length - 1] * 1000).toISOString().slice(0, 10) : null,
+    dates: T.map(dateOf),
+    lastDate: T.length ? dateOf(T[T.length - 1]) : null,
     currency: meta.currency || null,
     exchange: meta.fullExchangeName || meta.exchangeName || null,
     name: meta.longName || meta.shortName || ticker,
