@@ -5,7 +5,7 @@
 // The method runs on the MONTHLY chart and admits a stock to the tracking
 // list only when ALL seven checks pass:
 //   N1 — tradable: average daily volume above 1,000,000 (lenient 800,000)
-//   N2 — rising sequence on the monthly chart (closing basis)
+//   N2 — rising sequence on the monthly chart (sequence-break points)
 //   N3 — the whole last candle, including its lower tail, above MA5
 //   N4 — MA5 sloping upward
 //   N5 — the last CLOSED candle is green
@@ -20,7 +20,8 @@
 // there yet) · NO_TRACK · INCOMPLETE (missing data).
 // ─────────────────────────────────────────────────────────────
 
-const { smaSeries, findPivotsClose } = require("./_sequence.js");
+const { smaSeries } = require("./_sequence.js");
+const { findSequencePoints } = require("./_engine.js");
 
 const VOL_STRICT = 1_000_000;
 const VOL_LENIENT = 800_000;
@@ -34,7 +35,7 @@ const MSG = {
       tier === "strict" ? `Avg daily volume ≈ ${avg} — clears the 1,000,000 bar`
       : tier === "lenient" ? `Avg daily volume ≈ ${avg} — clears only the lenient 800,000 bar`
       : `Avg daily volume ≈ ${avg} — below 800,000, not liquid enough`,
-    N2: (p0, p1, t0, t1) => `Peaks ${p0}→${p1}, troughs ${t0}→${t1} (closing basis, monthly)`,
+    N2: (p0, p1, t0, t1) => `Peaks ${p0}→${p1}, troughs ${t0}→${t1} (sequence points, monthly)`,
     N2sparse: () => `Sparse pivots — coarse half-vs-half structure; confirm visually`,
     N3: (lo, ma, ok) => `Candle low ${lo} ${ok ? ">" : "≤"} MA5 ${ma} — whole candle ${ok ? "above" : "not above"}`,
     N4: (now, prev, ok) => `MA5 ${now} vs prior ${prev} → ${ok ? "sloping up" : "not sloping up"}`,
@@ -48,7 +49,7 @@ const MSG = {
       tier === "strict" ? `מחזור יומי ממוצע ≈ ${avg} — עובר את רף ה-1,000,000`
       : tier === "lenient" ? `מחזור יומי ממוצע ≈ ${avg} — עובר רק את הרף המקל של 800,000`
       : `מחזור יומי ממוצע ≈ ${avg} — מתחת ל-800,000, לא סחיר מספיק`,
-    N2: (p0, p1, t0, t1) => `פסגות ${p0}→${p1}, שפלים ${t0}→${t1} (בסיס סגירה, חודשי)`,
+    N2: (p0, p1, t0, t1) => `פסגות ${p0}→${p1}, שפלים ${t0}→${t1} (נקודות רצף, חודשי)`,
     N2sparse: () => `מעט נקודות מפנה — בדיקת מבנה גסה; ודאו ויזואלית`,
     N3: (lo, ma, ok) => `נמוך הנר ${lo} ${ok ? ">" : "≤"} MA5 ${ma} — כל הנר ${ok ? "מעל" : "לא מעל"}`,
     N4: (now, prev, ok) => `MA5 ${now} מול קודם ${prev} ← ${ok ? "משופע מעלה" : "אינו משופע מעלה"}`,
@@ -91,7 +92,7 @@ function evaluate({ monthly, monthlyDates, daily, lang = "en", swingN = 2, now =
   } : null;
   const last = evalIdx;
   const ma5 = c ? smaSeries(c.close, 5) : [];
-  const pivots = c ? findPivotsClose(c.close, swingN) : { ph: [], pl: [] };
+  const pivots = c ? findSequencePoints(c.open, c.high, c.low, c.close) : { ph: [], pl: [] };
 
   // N1 — tradable: average daily volume over ~a month of sessions.
   let avgDailyVolume = null, volumeTier = null;
@@ -110,7 +111,7 @@ function evaluate({ monthly, monthlyDates, daily, lang = "en", swingN = 2, now =
     // Not enough closed monthly candles to say anything about N2–N7.
     for (const id of ["N2", "N3", "N4", "N5", "N6", "N7"]) put(id, null, "guess", "");
   } else {
-    // N2 — rising sequence on the monthly chart (closing basis), same
+    // N2 — rising sequence on the monthly chart (sequence-break points), same
     // structure test as the Sequence Method's S1: peaks AND troughs rising.
     {
       const { ph, pl } = pivots;

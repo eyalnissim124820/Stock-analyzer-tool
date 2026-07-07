@@ -6719,7 +6719,6 @@
    "exchange": "NasdaqGS",
    "currency": "USD",
    "lastDate": "2026-06-26",
-   "swingN": 2,
    "technique": 1,
    "timeframe": "Daily",
    "requestedTimeframe": "Weekly",
@@ -6733,9 +6732,9 @@
    "marketTrend": "rising",
    "checks": {
     "S1": {
-     "value": "no",
+     "value": "yes",
      "conf": "swing",
-     "why": "Peaks 118.68→106.04, troughs 105.83→105.73 (closing basis)"
+     "why": "Peaks 119.88→123.42, troughs 101.37→104.65 (sequence points)"
     },
     "S2": {
      "value": "no",
@@ -6758,9 +6757,9 @@
      "why": "MA20–MA40 gap 4.911 vs prior 4.338 → widening/equal"
     },
     "S4": {
-     "value": "yes",
+     "value": "no",
      "conf": "guess",
-     "why": "Broken resistance ≈ 118.81 now holding as support (closing basis)"
+     "why": "No broken-resistance-turned-support found"
     },
     "C1": {
      "value": "no",
@@ -6770,12 +6769,12 @@
     "C2": {
      "value": "no",
      "conf": "exact",
-     "why": "Min CCI(5) ≈ 2 (need ≤ −100); stale oversold"
+     "why": "Min CCI(5) ≈ -167 (need ≤ −100); stale oversold"
     },
     "C3": {
-     "value": "no",
+     "value": "yes",
      "conf": "swing",
-     "why": "Prior rise high-candle low 197.28; no full undercut"
+     "why": "Prior rise high-candle low 212.78; a candle closed fully below it"
     },
     "T1": {
      "value": "no",
@@ -6785,7 +6784,7 @@
     "T2": {
      "value": "no",
      "conf": "exact",
-     "why": "Reward/risk ≈ -0.67× (hard gate ≥ 1.5)"
+     "why": "Reward/risk ≈ -0.08× (hard gate ≥ 1.5)"
     },
     "M1": {
      "value": "yes",
@@ -6795,28 +6794,28 @@
    },
    "math": {
     "buy": 217.92,
-    "stopLow": 198.09,
-    "target": 197.88,
-    "risk": 13.649504405286335,
-    "reward": -9.196035242290746,
-    "ratio": -0.6737266767523956,
-    "maxBuy": 198.0253846153846,
-    "midCandle": 199.425,
+    "stopLow": 197.28,
+    "target": 215.52,
+    "risk": 14.207048458149771,
+    "reward": -1.1013215859030734,
+    "ratio": -0.07751937984496056,
+    "maxBuy": 202.8923076923077,
+    "midCandle": 197.66500000000002,
     "broke": true,
-    "breakLevel": 199.12
+    "breakLevel": 197.79
    },
    "position": {
     "riskZero": true,
     "ma5Rising": true
    },
    "sell": {
-    "risingSeqLow": 197.28,
+    "risingSeqLow": 212.78,
     "upperBand": 216.7364891859615,
     "lastIsSeller": false
    },
    "conclusion": {
     "code": "NO_TRADE",
-    "firstFail": "S1",
+    "firstFail": "S2",
     "marketTrend": "rising",
     "stratOk": false,
     "corrOk": false,
@@ -6827,108 +6826,40 @@
    "pivots": {
     "ph": [
      {
-      "i": 25,
-      "price": 211.3
-     },
-     {
       "i": 28,
-      "price": 211.63
-     },
-     {
-      "i": 32,
-      "price": 211
-     },
-     {
-      "i": 45,
-      "price": 207.53
-     },
-     {
-      "i": 49,
-      "price": 207.04
-     },
-     {
-      "i": 57,
-      "price": 203.42
-     },
-     {
-      "i": 60,
-      "price": 203.74
+      "price": 213.13
      },
      {
       "i": 76,
-      "price": 214.18
-     },
-     {
-      "i": 82,
-      "price": 214.77
-     },
-     {
-      "i": 88,
-      "price": 213.17
-     },
-     {
-      "i": 99,
-      "price": 206.8
-     },
-     {
-      "i": 113,
-      "price": 197.88
+      "price": 215.52
      }
     ],
     "pl": [
      {
-      "i": 33,
-      "price": 210.06
-     },
-     {
-      "i": 38,
-      "price": 208.11
-     },
-     {
-      "i": 47,
-      "price": 206.75
-     },
-     {
-      "i": 56,
-      "price": 202.63
-     },
-     {
-      "i": 80,
-      "price": 213.7
-     },
-     {
-      "i": 86,
-      "price": 213.13
-     },
-     {
-      "i": 96,
-      "price": 206.55
+      "i": 58,
+      "price": 201.55
      },
      {
       "i": 111,
-      "price": 196.67
-     },
-     {
-      "i": 116,
-      "price": 197.62
+      "price": 195.68
      }
     ]
    },
    "segments": {
     "peak": {
-     "i": 113,
-     "price": 197.88
+     "i": 76,
+     "price": 215.52
     },
     "priorPeak": {
-     "i": 99,
-     "price": 206.8
+     "i": 28,
+     "price": 213.13
     },
     "riseLow": {
-     "i": 111,
-     "price": 196.67
+     "i": 58,
+     "price": 201.55
     },
-    "corrLowIdx": 114,
-    "corrLow": 196.35,
+    "corrLowIdx": 111,
+    "corrLow": 195.68,
     "last": 139
    },
    "candles": {
@@ -8659,7 +8590,6 @@
    "exchange": "NasdaqGS",
    "currency": "USD",
    "lastDate": "2026-06-26",
-   "swingN": 2,
    "technique": 2,
    "timeframe": "Daily",
    "requestedTimeframe": "Daily",
@@ -8675,7 +8605,7 @@
     "S1": {
      "value": "no",
      "conf": "swing",
-     "why": "Peaks 103.65→90.84, troughs 88.81→90.53 (closing basis)"
+     "why": "Peaks 104.96→104.63, troughs 101.46→87.78 (sequence points)"
     },
     "S2": {
      "value": "no",
@@ -8700,7 +8630,7 @@
     "S4": {
      "value": "yes",
      "conf": "guess",
-     "why": "Broken resistance ≈ 89.34 now holding as support (closing basis)"
+     "why": "Broken resistance ≈ 93.91 now holding as support"
     },
     "G1": {
      "value": "yes",
@@ -8715,12 +8645,12 @@
     "C2": {
      "value": "no",
      "conf": "exact",
-     "why": "Min CCI(5) ≈ -69 (need ≤ −100); stale oversold"
+     "why": "Min CCI(5) ≈ -167 (need ≤ −100); stale oversold"
     },
     "C3": {
-     "value": "no",
+     "value": "yes",
      "conf": "swing",
-     "why": "Prior rise high-candle low 88.82; no full undercut"
+     "why": "Prior rise high-candle low 103.08; a candle closed fully below it"
     },
     "T1": {
      "value": "no",
@@ -8730,7 +8660,7 @@
     "T2": {
      "value": "no",
      "conf": "exact",
-     "why": "Reward/risk ≈ -0.63× (hard gate ≥ 1.5)"
+     "why": "Reward/risk ≈ -0.23× (hard gate ≥ 1.5)"
     },
     "M1": {
      "value": "yes",
@@ -8740,22 +8670,22 @@
    },
    "math": {
     "buy": 112.35,
-    "stopLow": 89.73,
-    "target": 90.84,
-    "risk": 30.20026702269692,
-    "reward": -19.14552736982643,
-    "ratio": -0.6339522546419097,
-    "maxBuy": 90.07153846153847,
-    "midCandle": 90.65,
+    "stopLow": 90.12,
+    "target": 104.63,
+    "risk": 29.679572763684902,
+    "reward": -6.8713840676457485,
+    "ratio": -0.23151896836107366,
+    "maxBuy": 94.58461538461538,
+    "midCandle": 91.02000000000001,
     "broke": true,
-    "breakLevel": 90.97
+    "breakLevel": 90.85
    },
    "position": {
     "riskZero": true,
     "ma5Rising": true
    },
    "sell": {
-    "risingSeqLow": 88.82,
+    "risingSeqLow": 103.08,
     "upperBand": 111.07065328895767,
     "lastIsSeller": false
    },
@@ -8772,96 +8702,48 @@
    "pivots": {
     "ph": [
      {
-      "i": 27,
-      "price": 92.54
+      "i": 28,
+      "price": 93.91
      },
      {
-      "i": 31,
-      "price": 91.85
-     },
-     {
-      "i": 38,
-      "price": 89.34
-     },
-     {
-      "i": 52,
-      "price": 85.4
-     },
-     {
-      "i": 58,
-      "price": 85.74
-     },
-     {
-      "i": 81,
-      "price": 104.15
+      "i": 82,
+      "price": 104.96
      },
      {
       "i": 86,
-      "price": 103.65
-     },
-     {
-      "i": 114,
-      "price": 90.84
+      "price": 104.63
      }
     ],
     "pl": [
      {
-      "i": 3,
-      "price": 71.95
-     },
-     {
-      "i": 29,
-      "price": 90.97
-     },
-     {
-      "i": 37,
-      "price": 89
-     },
-     {
       "i": 48,
-      "price": 84.39
+      "price": 82.9
      },
      {
-      "i": 56,
-      "price": 84.45
-     },
-     {
-      "i": 60,
-      "price": 84.89
-     },
-     {
-      "i": 83,
-      "price": 102.82
-     },
-     {
-      "i": 88,
-      "price": 101.58
+      "i": 84,
+      "price": 101.46
      },
      {
       "i": 111,
-      "price": 88.81
-     },
-     {
-      "i": 119,
-      "price": 90.53
+      "price": 87.78
      }
     ]
    },
    "segments": {
     "peak": {
-     "i": 114,
-     "price": 90.84
+     "i": 86,
+     "price": 104.63
     },
     "priorPeak": {
-     "i": 86,
-     "price": 103.65
+     "i": 82,
+     "price": 104.96
     },
     "riseLow": {
-     "i": 111,
-     "price": 88.81
+     "i": 84,
+     "price": 101.46
     },
-    "corrLowIdx": 114,
-    "corrLow": 88.82,
+    "corrLowIdx": 111,
+    "corrLow": 87.78,
     "last": 139
    },
    "candles": {
@@ -10593,7 +10475,6 @@
    "exchange": "Tel Aviv",
    "currency": "ILS",
    "lastDate": "2026-06-26",
-   "swingN": 2,
    "technique": 2,
    "timeframe": "Weekly",
    "requestedTimeframe": "Weekly",
@@ -10607,9 +10488,9 @@
    "marketTrend": "mixed",
    "checks": {
     "S1": {
-     "value": "yes",
+     "value": "no",
      "conf": "swing",
-     "why": "פסגות 131.33→134.09, שפלים 117.66→131.18 (בסיס סגירה)"
+     "why": "פסגות 125.63→139.08, שפלים 121.81→116.42 (נקודות רצף)"
     },
     "S2": {
      "value": "no",
@@ -10634,7 +10515,7 @@
     "S4": {
      "value": "yes",
      "conf": "guess",
-     "why": "התנגדות שנפרצה ≈ 131.33 מחזיקה כעת כתמיכה (בסיס סגירה)"
+     "why": "התנגדות שנפרצה ≈ 125.63 מחזיקה כעת כתמיכה"
     },
     "G1": {
      "value": "yes",
@@ -10649,22 +10530,22 @@
     "C2": {
      "value": "yes",
      "conf": "exact",
-     "why": "CCI(5) מינ׳ ≈ -163 (נדרש ≤ ‎−100); טרי (≤~3 נרות)"
+     "why": "CCI(5) מינ׳ ≈ -167 (נדרש ≤ ‎−100); טרי (≤~3 נרות)"
     },
     "C3": {
-     "value": "no",
+     "value": "yes",
      "conf": "swing",
-     "why": "נמוך נר השיא ברצף הקודם 133.14; אין חדירה מלאה"
+     "why": "נמוך נר השיא ברצף הקודם 136.68; נר נסגר כולו מתחתיו"
     },
     "T1": {
      "value": "no",
      "conf": "swing",
-     "why": "טרם נשבר; שפל חדש > שיא קודם ✓ (שער איכות)"
+     "why": "הרצף נשבר כלפי מעלה; שפל חדש ≤ שיא קודם ✗"
     },
     "T2": {
      "value": "no",
      "conf": "exact",
-     "why": "סיכוי/סיכון ≈ 0.52× (שער קשיח ≥ 1.5)"
+     "why": "סיכוי/סיכון ≈ 0.26× (שער קשיח ≥ 1.5)"
     },
     "M1": {
      "value": "yes",
@@ -10674,31 +10555,31 @@
    },
    "math": {
     "buy": 133.2,
-    "stopLow": 132.05,
-    "target": 134.09,
-    "risk": 1.2950450450450195,
-    "reward": 0.6681681681681794,
-    "ratio": 0.5159420289855261,
-    "maxBuy": 132.6776923076923,
-    "midCandle": 133.35500000000002,
-    "broke": false,
-    "breakLevel": 134.66
+    "stopLow": 117.9,
+    "target": 139.08,
+    "risk": 17.229729729729712,
+    "reward": 4.414414414414432,
+    "ratio": 0.2562091503267987,
+    "maxBuy": 124.41692307692308,
+    "midCandle": 119.435,
+    "broke": true,
+    "breakLevel": 119.31
    },
    "position": {
     "riskZero": false,
     "ma5Rising": false
    },
    "sell": {
-    "risingSeqLow": 133.14,
+    "risingSeqLow": 136.68,
     "upperBand": 134.1316090724093,
     "lastIsSeller": false
    },
    "conclusion": {
     "code": "NO_TRADE",
-    "firstFail": "S2",
+    "firstFail": "S1",
     "marketTrend": "mixed",
     "stratOk": false,
-    "corrOk": false,
+    "corrOk": true,
     "t1Ok": false,
     "t2Ok": false,
     "horizon": "medium"
@@ -10706,80 +10587,56 @@
    "pivots": {
     "ph": [
      {
-      "i": 27,
-      "price": 142.07
+      "i": 2,
+      "price": 127.9
      },
      {
-      "i": 56,
-      "price": 124.74
+      "i": 29,
+      "price": 142.75
+     },
+     {
+      "i": 57,
+      "price": 125.63
      },
      {
       "i": 78,
-      "price": 138.29
-     },
-     {
-      "i": 86,
-      "price": 137.12
-     },
-     {
-      "i": 130,
-      "price": 131.33
-     },
-     {
-      "i": 135,
-      "price": 134.09
+      "price": 139.08
      }
     ],
     "pl": [
      {
       "i": 3,
-      "price": 125.97
+      "price": 125.26
      },
      {
-      "i": 54,
-      "price": 122.98
+      "i": 55,
+      "price": 122.32
      },
      {
-      "i": 62,
-      "price": 123.19
+      "i": 63,
+      "price": 121.81
      },
      {
-      "i": 83,
-      "price": 136.31
-     },
-     {
-      "i": 87,
-      "price": 136.61
-     },
-     {
-      "i": 97,
-      "price": 129.36
-     },
-     {
-      "i": 115,
-      "price": 117.66
-     },
-     {
-      "i": 132,
-      "price": 131.18
+      "i": 116,
+      "price": 116.42
      }
     ]
    },
    "segments": {
     "peak": {
-     "i": 135,
-     "price": 134.09
+     "i": 78,
+     "price": 139.08
     },
     "priorPeak": {
-     "i": 130,
-     "price": 131.33
+     "i": 57,
+     "price": 125.63
     },
     "riseLow": {
-     "i": 132,
-     "price": 131.18
+     "i": 63,
+     "price": 121.81
     },
-    "corrLowIdx": 139,
-    "corrLow": 132.05,
+    "corrLowIdx": 116,
+    "corrLow": 116.42,
     "last": 139
    },
    "candles": {
@@ -12509,7 +12366,6 @@
    "exchange": "Tel Aviv",
    "currency": "ILS",
    "lastDate": "2026-06-26",
-   "swingN": 2,
    "technique": 1,
    "timeframe": "Daily",
    "requestedTimeframe": "Weekly",
@@ -12523,9 +12379,9 @@
    "marketTrend": "mixed",
    "checks": {
     "S1": {
-     "value": "no",
+     "value": "yes",
      "conf": "swing",
-     "why": "Peaks 208.58→197.50, troughs 196.88→192.77 (closing basis)"
+     "why": "Peaks 200.26→210.79, troughs 186.29→191.41 (sequence points)"
     },
     "S2": {
      "value": "no",
@@ -12550,22 +12406,22 @@
     "S4": {
      "value": "yes",
      "conf": "guess",
-     "why": "Broken resistance ≈ 189.27 now holding as support (closing basis)"
+     "why": "Broken resistance ≈ 200.26 now holding as support"
     },
     "C1": {
      "value": "no",
      "conf": "exact",
-     "why": "Falling sequence not below MA5; MA5 not down"
+     "why": "Falling sequence below MA5; MA5 not down"
     },
     "C2": {
      "value": "no",
      "conf": "exact",
-     "why": "Min CCI(5) ≈ 62 (need ≤ −100); stale oversold"
+     "why": "Min CCI(5) ≈ -164 (need ≤ −100); stale oversold"
     },
     "C3": {
-     "value": "no",
+     "value": "yes",
      "conf": "swing",
-     "why": "Prior rise high-candle low 208.88; no full undercut"
+     "why": "Prior rise high-candle low 215.12; a candle closed fully below it"
     },
     "T1": {
      "value": "no",
@@ -12575,7 +12431,7 @@
     "T2": {
      "value": "no",
      "conf": "exact",
-     "why": "Reward/risk ≈ -0.68× (hard gate ≥ 1.5)"
+     "why": "Reward/risk ≈ -0.38× (hard gate ≥ 1.5)"
     },
     "M1": {
      "value": "yes",
@@ -12585,28 +12441,28 @@
    },
    "math": {
     "buy": 227.86,
-    "stopLow": 211.28,
-    "target": 210.91,
-    "risk": 10.914596682173272,
-    "reward": -7.4387781971386016,
-    "ratio": -0.681544028950543,
-    "maxBuy": 211.16615384615383,
-    "midCandle": 212.51999999999998,
+    "stopLow": 208.13,
+    "target": 216.62,
+    "risk": 12.988238391995093,
+    "reward": -4.932853506539106,
+    "ratio": -0.3797938841020443,
+    "maxBuy": 210.7423076923077,
+    "midCandle": 209.125,
     "broke": true,
-    "breakLevel": 212.41
+    "breakLevel": 208.61
    },
    "position": {
     "riskZero": false,
     "ma5Rising": true
    },
    "sell": {
-    "risingSeqLow": 208.88,
+    "risingSeqLow": 215.12,
     "upperBand": 227.63004722030746,
     "lastIsSeller": false
    },
    "conclusion": {
     "code": "NO_TRADE",
-    "firstFail": "S1",
+    "firstFail": "S2",
     "marketTrend": "mixed",
     "stratOk": false,
     "corrOk": false,
@@ -12618,91 +12474,47 @@
     "ph": [
      {
       "i": 28,
-      "price": 215.65
+      "price": 217
      },
      {
-      "i": 51,
-      "price": 200.55
-     },
-     {
-      "i": 54,
-      "price": 200.17
-     },
-     {
-      "i": 61,
-      "price": 200.99
-     },
-     {
-      "i": 86,
-      "price": 215.91
+      "i": 84,
+      "price": 217.09
      },
      {
       "i": 91,
-      "price": 215.96
-     },
-     {
-      "i": 94,
-      "price": 215.05
-     },
-     {
-      "i": 102,
-      "price": 213.27
-     },
-     {
-      "i": 115,
-      "price": 210.91
+      "price": 216.62
      }
     ],
     "pl": [
      {
-      "i": 48,
-      "price": 200.26
-     },
-     {
-      "i": 52,
-      "price": 200.08
-     },
-     {
       "i": 57,
-      "price": 198.85
-     },
-     {
-      "i": 85,
-      "price": 215.29
+      "price": 197.89
      },
      {
       "i": 88,
-      "price": 214.97
-     },
-     {
-      "i": 92,
-      "price": 214.49
-     },
-     {
-      "i": 100,
-      "price": 212.84
+      "price": 214.18
      },
      {
       "i": 111,
-      "price": 207.68
+      "price": 206.52
      }
     ]
    },
    "segments": {
     "peak": {
-     "i": 115,
-     "price": 210.91
+     "i": 91,
+     "price": 216.62
     },
     "priorPeak": {
-     "i": 102,
-     "price": 213.27
+     "i": 84,
+     "price": 217.09
     },
     "riseLow": {
-     "i": 111,
-     "price": 207.68
+     "i": 88,
+     "price": 214.18
     },
-    "corrLowIdx": 115,
-    "corrLow": 208.88,
+    "corrLowIdx": 111,
+    "corrLow": 206.52,
     "last": 139
    },
    "candles": {
