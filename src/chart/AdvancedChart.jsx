@@ -259,6 +259,49 @@ export default function AdvancedChart({ data, view, setView, W = 1200, H = 640, 
 
   // ── peaks & troughs overlays ──
   const pts = peaks?.points || [];
+
+  // Bursagraph-style swing markers (the default structure display): a gray
+  // arrow on the confirmed swing candle itself (↓ above a peak's high, ↑ below
+  // a trough's low) plus a colored triangle on the BREAK candle whose close
+  // confirmed it (red ▼ above for a broken rising sequence, green ▲ below for
+  // a broken falling one). Provisional (still-running) extremes get no marker —
+  // same as the reference platform.
+  const MARK_GRAY = "#9AA0AE";
+  const inWin = (i) => i != null && i >= start && i < end;
+  const markArrow = (i, up, key) => {
+    const cx = x(i);
+    const s = up ? -1 : 1; // marker sits below the candle when up (pointing up at it)
+    const tip = up ? yP(candles.low[i]) + 5 : yP(candles.high[i]) - 5;
+    return (
+      <g key={key} stroke={MARK_GRAY} fill="none" strokeWidth={1.5} opacity={0.9}>
+        <line x1={cx} y1={tip - s * 10} x2={cx} y2={tip - s * 2} />
+        <path d={`M ${cx - 3.2} ${tip - s * 5.5} L ${cx} ${tip - s * 1.5} L ${cx + 3.2} ${tip - s * 5.5}`} strokeLinejoin="round" />
+      </g>
+    );
+  };
+  const markTriangle = (i, up, key) => {
+    const cx = x(i);
+    if (up) {
+      const yy = yP(candles.low[i]) + 5;
+      return <path key={key} d={`M ${cx - 4} ${yy + 7} L ${cx + 4} ${yy + 7} L ${cx} ${yy} Z`} fill={C.green} opacity={0.95} />;
+    }
+    const yy = yP(candles.high[i]) - 5;
+    return <path key={key} d={`M ${cx - 4} ${yy - 7} L ${cx + 4} ${yy - 7} L ${cx} ${yy} Z`} fill={C.red} opacity={0.95} />;
+  };
+  const markEls = overlays.marks && pts.length > 0 && (
+    <g>
+      {pts.filter((p) => !p.provisional).map((p, j) => {
+        const up = p.kind === "L"; // trough markers sit below, peak markers above
+        return (
+          <g key={`mk${j}`}>
+            {inWin(p.i) && markArrow(p.i, up, `a${j}`)}
+            {inWin(p.breakIdx) && markTriangle(p.breakIdx, up, `t${j}`)}
+          </g>
+        );
+      })}
+    </g>
+  );
+
   const zigzagEls = overlays.zigzag && pts.length >= 2 && (() => {
     const solid = [], last = pts[pts.length - 1];
     const confirmed = last.provisional ? pts.slice(0, -1) : pts;
@@ -487,6 +530,7 @@ export default function AdvancedChart({ data, view, setView, W = 1200, H = 640, 
           {fibEls}
           {srEls}
           {zigzagEls}
+          {markEls}
           {lastEls}
         </g>
 

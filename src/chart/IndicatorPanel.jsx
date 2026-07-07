@@ -14,7 +14,10 @@ const FONT = FONT_EN;
 export const DEFAULT_INDICATORS = {
   panels: { volume: true, rsi: false, macd: false },
   overlays: {
-    boll: false, zigzag: true, sr: true, fib: false,
+    // "marks" = per-candle swing markers (arrow on the swing candle, triangle
+    // on the break candle) — the reference-platform display and the default.
+    // The connecting zigzag + HH/HL labels stay available as an opt-in.
+    boll: false, marks: true, zigzag: false, sr: true, fib: false,
     sma5: false, sma13: false, sma20: true, sma40: false, sma50: true, sma200: false,
     ema9: false, ema21: false, ema50: false,
   },
@@ -71,6 +74,7 @@ export default function IndicatorPanel({ ind, setInd, t }) {
           <Chip on={ind.panels.macd} label="MACD" onClick={() => togglePanel("macd")} />
         </Group>
         <Group title={t.structure}>
+          <Chip on={ind.overlays.marks} label="Swings" color="#9AA0AE" onClick={() => toggleOverlay("marks")} />
           <Chip on={ind.overlays.zigzag} label="Zigzag" color={C.amber} onClick={() => toggleOverlay("zigzag")} />
           <Chip on={ind.overlays.sr} label="S/R" color={C.blue} onClick={() => toggleOverlay("sr")} />
           <Chip on={ind.overlays.fib} label="Fib" color="#B37FEB" onClick={() => toggleOverlay("fib")} />

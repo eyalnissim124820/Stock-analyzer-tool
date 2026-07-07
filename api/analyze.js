@@ -13,6 +13,11 @@
 const { analyze, conclude } = require("./_engine.js");
 const { resolveTase } = require("./_tase.js");
 const { classifySwings, trendVerdict, srLevels, fibLevels } = require("./_peaks.js");
+// Shared Israeli-calendar aggregation (weeks are Sunday→Thursday on TASE —
+// Yahoo's Monday-anchored 1wk bars are wrong for .TA symbols). This tool keeps
+// its own private FETCH, but the bar-building math must be the single shared
+// implementation so all tools chart the exact same candles.
+const { aggregateTaseCandles } = require("./_yahoo.js");
 
 // Build the Peaks & Troughs structure payload from the verdict's own
 // sequence-based points, so the chart's zigzag/labels mirror the analysis
@@ -62,15 +67,16 @@ function ymdInTz(epochSec, tz) {
   });
   return f.format(new Date(epochSec * 1000)); // "YYYY-MM-DD"
 }
-// ISO-week key (e.g. "2026-W23") of an epoch-seconds instant, in the exchange tz.
-function isoWeekKeyInTz(epochSec, tz) {
+// Sunday-anchored week key (the Sunday on/before the instant's date, in the
+// exchange tz). TASE weeks run Sunday→Thursday, so a Monday-anchored (ISO) key
+// would file a Sunday session into the PREVIOUS week and miss a forming bar.
+// Sunday anchoring is equally correct for US bars — there are no weekend
+// sessions, so Mon–Fri timestamps group identically.
+function weekKeyInTz(epochSec, tz) {
   const [y, m, d] = ymdInTz(epochSec, tz).split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
-  const dayNum = (dt.getUTCDay() + 6) % 7;         // Mon=0 … Sun=6
-  dt.setUTCDate(dt.getUTCDate() - dayNum + 3);     // shift to the Thursday of this ISO week
-  const firstThu = new Date(Date.UTC(dt.getUTCFullYear(), 0, 4));
-  const week = 1 + Math.round(((dt - firstThu) / 86400000 - 3 + ((firstThu.getUTCDay() + 6) % 7)) / 7);
-  return `${dt.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+  dt.setUTCDate(dt.getUTCDate() - dt.getUTCDay()); // back to Sunday
+  return dt.toISOString().slice(0, 10);
 }
 
 // True if the last returned bar's period has NOT closed yet, given Yahoo meta,
@@ -88,16 +94,20 @@ function isLastBarForming(meta, lastTs, interval, now) {
   }
   // Weekly / monthly: an in-progress higher-timeframe bar is incomplete until the
   // calendar period rolls over (same convention the Monthly Tracker uses).
-  if (interval === "1wk") return isoWeekKeyInTz(lastTs, tz) === isoWeekKeyInTz(now, tz);
+  if (interval === "1wk") return weekKeyInTz(lastTs, tz) === weekKeyInTz(now, tz);
   if (interval === "1mo") return ymdInTz(lastTs, tz).slice(0, 7) === ymdInTz(now, tz).slice(0, 7);
   return false;
 }
 
 async function fetchCandles(ticker, timeframe, { now = Date.now() / 1000 } = {}) {
   const tf = TIMEFRAMES[timeframe] || TIMEFRAMES.Daily;
+  // TASE weekly/monthly: fetch dailies and build the bars on the Israeli
+  // calendar (Sunday→Thursday weeks) — Yahoo's own 1wk bars are Monday-anchored
+  // and produce different candles than every Israeli platform.
+  const tase = /\.TA$/i.test(ticker) && (tf.interval === "1wk" || tf.interval === "1mo");
   const url =
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}` +
-    `?range=${tf.range}&interval=${tf.interval}&includePrePost=false`;
+    `?range=${tf.range}&interval=${tase ? "1d" : tf.interval}&includePrePost=false`;
   const res = await fetch(url, {
     headers: {
       "User-Agent":
@@ -119,10 +129,16 @@ async function fetchCandles(ticker, timeframe, { now = Date.now() / 1000 } = {})
   if (!open || !close) throw new Error("Malformed OHLCV from Yahoo");
 
   // Drop any rows with null fields (Yahoo occasionally returns gaps).
-  const O = [], H = [], L = [], C = [], V = [], T = [];
+  let O = [], H = [], L = [], C = [], V = [], T = [];
   for (let i = 0; i < close.length; i++) {
     if ([open[i], high[i], low[i], close[i], volume[i]].some((x) => x == null)) continue;
     O.push(open[i]); H.push(high[i]); L.push(low[i]); C.push(close[i]); V.push(volume[i]); T.push(ts[i]);
+  }
+  // Israeli-calendar weekly/monthly bars from the cleaned dailies.
+  if (tase) {
+    const agg = aggregateTaseCandles({ open: O, high: H, low: L, close: C, volume: V }, T, tf.interval);
+    ({ open: O, high: H, low: L, close: C, volume: V } = agg.candles);
+    T = agg.T;
   }
   // Entry candle = most recent CLOSED bar: drop a still-forming last bar so the
   // engine's `last` candle is always closed (per the method).
@@ -192,4 +208,4 @@ module.exports = handler;
 // Exposed for unit tests (entry-candle guard, `now` injectable).
 module.exports.isLastBarForming = isLastBarForming;
 module.exports.ymdInTz = ymdInTz;
-module.exports.isoWeekKeyInTz = isoWeekKeyInTz;
+module.exports.weekKeyInTz = weekKeyInTz;

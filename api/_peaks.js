@@ -152,15 +152,17 @@ function zigzagLookback(candles, { lookback = 2 } = {}) {
 //
 // We adapt the engine's { highs, lows, current } shape into merged alternating
 // points and flag the still-running sequence's extreme `provisional` so the UI
-// can draw its leg dashed.
+// can draw its leg dashed. Each confirmed point carries `breakIdx` — the bar
+// whose close broke the sequence and confirmed it — so the chart can mark the
+// break candle too (the reference platform's red/green triangles).
 function zigzagSequence(candles) {
   const { open, high, low, close } = candles;
   const n = close.length;
   if (n < 2) return [];
   const { highs, lows, current } = sequenceStructure(open, high, low, close);
   const pts = [
-    ...highs.map((h) => ({ i: h.i, price: h.high, kind: "H" })),
-    ...lows.map((l) => ({ i: l.i, price: l.low, kind: "L" })),
+    ...highs.map((h) => ({ i: h.i, price: h.high, kind: "H", breakIdx: h.breakIdx })),
+    ...lows.map((l) => ({ i: l.i, price: l.low, kind: "L", breakIdx: l.breakIdx })),
   ].sort((a, b) => a.i - b.i);
   // The running sequence hasn't broken yet — its extreme is not a confirmed point.
   const { dir, extremeIdx } = current;

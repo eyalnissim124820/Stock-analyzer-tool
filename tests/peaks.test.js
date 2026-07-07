@@ -103,7 +103,7 @@ const alternates = (pts) => pts.every((p, i) => i === 0 || p.kind !== pts[i - 1]
     const pts = zigzagSequence(c);
     const confirmed = pts.filter((p) => !p.provisional);
     assert.strictEqual(confirmed.length, 1, `expected 1 confirmed point, got ${kinds(confirmed)}`);
-    assert.deepStrictEqual(confirmed[0], { i: 3, price: 13.2, kind: "H" });
+    assert.deepStrictEqual(confirmed[0], { i: 3, price: 13.2, kind: "H", breakIdx: 5 });
     // The running falling sequence's low is provisional, and points alternate.
     const last = pts[pts.length - 1];
     assert.strictEqual(last.kind, "L");
@@ -139,7 +139,7 @@ const alternates = (pts) => pts.every((p, i) => i === 0 || p.kind !== pts[i - 1]
     const pts = zigzagSequence(c);
     const confirmed = pts.filter((p) => !p.provisional);
     assert.strictEqual(confirmed.length, 1, `expected the peak to confirm, got ${kinds(confirmed)}`);
-    assert.deepStrictEqual(confirmed[0], { i: 2, price: 13.0, kind: "H" });
+    assert.deepStrictEqual(confirmed[0], { i: 2, price: 13.0, kind: "H", breakIdx: 4 });
     const last = pts[pts.length - 1];
     assert.strictEqual(last.kind, "L");
     assert.strictEqual(last.provisional, true);
